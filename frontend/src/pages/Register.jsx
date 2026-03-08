@@ -1,17 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Mail,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  TrendingUp,
-  AlertCircle,
-  X,
-} from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff, TrendingUp } from "lucide-react";
 
-import GradientSection from "@/components/GradientBg";
+import BoxesWrapper from "@/components/BoxesBg";
 import ShineForm from "@/components/ShineForm";
 import ShineBorderWrapper from "@/components/ShineBorder";
 import Button from "@/components/Button";
@@ -132,22 +123,22 @@ export default function Register() {
   };
 
   return (
-    <GradientSection className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <BoxesWrapper className="flex items-center justify-center px-4">
+      <div className="relative w-full max-w-md mx-auto">
         <div className="flex items-center mt-8 gap-2 mb-6 justify-center">
-          <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
             <TrendingUp className="w-6 h-6 text-white" />
           </div>
-          <span className="font-bold text-xl text-white">SokTauSaham</span>
+          <span className="font-bold text-xl text-bg-light">SokTauSaham</span>
         </div>
 
         <ShineBorderWrapper>
           <ShineForm
             title="Daftar Akun Baru"
             description="Buat akun untuk mulai analisis saham dengan AI"
-            className="mb-8 bg-slate-900/60 border border-slate-800 backdrop-blur-sm"
+            className="mb-8 bg-primary-dark/60 border border-primary/20 backdrop-blur-sm"
           >
-            <div className="text-center text-sm text-slate-400 mb-6">
+            <div className="text-center text-sm text-bg-light/70 mb-6">
               Step {step} of 2
             </div>
 
@@ -164,50 +155,50 @@ export default function Register() {
             {step === 1 && (
               <form onSubmit={handleStep1Submit} className="space-y-5 mt-4">
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Nama Lengkap</Label>
+                  <Label className="mb-2 block">Nama Lengkap</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="Nama kamu"
-                      className="pl-10 bg-slate-800/80 border-slate-700 text-white"
+                      placeholder="Nama lengkap"
+                      className="pl-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Email</Label>
+                  <Label className="mb-2 block">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="investor@example.com"
-                      className="pl-10 bg-slate-800/80 border-slate-700 text-white"
+                      className="pl-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Password</Label>
+                  <Label className="mb-2 block">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
                       placeholder="••••••••"
-                      className="pl-10 pr-10 bg-slate-800/80 border-slate-700 text-white"
+                      className="pl-10 pr-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-bg-light/70 hover:text-bg-light"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -215,21 +206,21 @@ export default function Register() {
                 </div>
 
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Konfirmasi Password</Label>
+                  <Label className="mb-2 block">Konfirmasi Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       placeholder="••••••••"
-                      className="pl-10 pr-10 bg-slate-800/80 border-slate-700 text-white"
+                      className="pl-10 pr-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-bg-light/70 hover:text-bg-light"
                     >
                       {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -245,8 +236,8 @@ export default function Register() {
             {step === 2 && (
               <form onSubmit={handleOtpSubmit} className="space-y-6 mt-4">
                 <div className="text-center">
-                  <p className="text-slate-400 mb-2">Kode verifikasi dikirim ke:</p>
-                  <p className="text-white font-semibold">{verificationEmail}</p>
+                  <p className="text-bg-light/70 mb-2">Kode verifikasi dikirim ke:</p>
+                  <p className="text-bg-light font-semibold">{verificationEmail}</p>
                 </div>
 
                 <div className="flex justify-center gap-3">
@@ -259,12 +250,12 @@ export default function Register() {
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpChange(i, e.target.value)}
-                      className="w-12 h-12 bg-slate-800 border border-slate-700 text-white text-center rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      className="w-12 h-12 bg-primary-dark/50 border border-primary/25 text-bg-light text-center rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   ))}
                 </div>
 
-                <div className="text-center text-sm text-slate-400">
+                <div className="text-center text-sm text-bg-light/70">
                   Kirim ulang dalam {formatTime(timer)}
                   {timer === 0 && (
                     <div className="mt-2">
@@ -272,7 +263,7 @@ export default function Register() {
                         type="button"
                         onClick={handleResendOtp}
                         disabled={isResending}
-                        className="text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
+                        className="text-accent hover:text-bg-light disabled:opacity-50"
                       >
                         {isResending ? "Mengirim..." : "Kirim Ulang"}
                       </button>
@@ -286,15 +277,15 @@ export default function Register() {
               </form>
             )}
 
-            <p className="text-center text-sm text-slate-400 mt-8">
+            <p className="text-center text-sm text-bg-light/70 mt-8">
               Sudah punya akun?{" "}
-              <Link to="/login" className="text-cyan-400 hover:text-cyan-300">
+              <Link to="/login" className="text-accent hover:text-bg-light">
                 Login
               </Link>
             </p>
           </ShineForm>
         </ShineBorderWrapper>
       </div>
-    </GradientSection>
+    </BoxesWrapper>
   );
 }

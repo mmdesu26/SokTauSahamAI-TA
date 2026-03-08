@@ -22,11 +22,11 @@ export function StyleButtonBase({
       )}
       {...props}
     >
-      {/* Cyan-Blue Gradient Border */}
-      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg blur-[1px]" />
+      {/* Gradient Border */}
+      <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent rounded-lg blur-[1px]" />
 
       {/* Inner Button */}
-      <div className="relative px-8 py-2 bg-slate-900 rounded-[6px] text-white font-semibold transition-all duration-300 hover:bg-cyan-600 hover:text-white shadow-lg hover:shadow-cyan-500/30">
+      <div className="relative px-8 py-2 bg-primary-dark rounded-[6px] text-white font-semibold transition-all duration-300 hover:bg-primary hover:text-white shadow-lg hover:shadow-accent/30">
         {children}
       </div>
     </button>

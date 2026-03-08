@@ -1,13 +1,6 @@
-"use client";
-
 import { cn } from "@/lib/utils";
 
-export default function ShineForm({
-  title,
-  description,
-  className = "",
-  children,
-}) {
+export default function ShineForm({ title, description, className = "", children }) {
   return (
     <div
       className={cn(
@@ -16,13 +9,13 @@ export default function ShineForm({
       )}
     >
       {title && (
-        <h2 className="text-xl font-bold text-center text-white">
+        <h2 className="text-xl font-bold text-center text-bg-light">
           {title}
         </h2>
       )}
 
       {description && (
-        <p className="mt-2 text-sm text-center text-slate-300">
+        <p className="mt-2 text-sm text-center text-bg-light/80">
           {description}
         </p>
       )}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   Navbar,
@@ -37,10 +37,10 @@ export default function ResizableNavbarWrapper({
               as="button"
               type="button"
               variant="secondary"
-              className="flex items-center gap-2 text-red-400 hover:text-red-300"
               onClick={onLogout}
+              className="flex items-center gap-2 !text-red-500 hover:!text-red-600 dark:!text-red-400 dark:hover:!text-red-300"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
               Logout
             </NavbarButton>
           ) : null}
@@ -66,8 +66,11 @@ export default function ResizableNavbarWrapper({
               className={({ isActive }) =>
                 cn(
                   "w-full rounded-md px-3 py-2 text-sm font-medium transition",
-                  "text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800",
-                  isActive && "bg-cyan-500/15 text-cyan-400 dark:bg-cyan-500/10"
+                  // warna menu sebelum aktif
+                  "text-primary-dark hover:bg-bg-light/40 dark:text-bg-light dark:hover:bg-primary/20",
+                  // warna menu saat aktif
+                  isActive &&
+                    "bg-accent/15 text-accent dark:bg-accent/10 dark:text-accent"
                 )
               }
             >
@@ -77,16 +80,16 @@ export default function ResizableNavbarWrapper({
 
           {onLogout ? (
             <>
-              <div className="h-px w-full bg-neutral-200 dark:bg-neutral-800 my-2" />
+              <div className="my-2 h-px w-full bg-primary-dark/15 dark:bg-bg-light/15" />
               <button
                 type="button"
                 onClick={() => {
                   closeMobile();
                   onLogout();
                 }}
-                className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-500/10 transition"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-500 transition hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="h-4 w-4" />
                 Logout
               </button>
             </>
@@ -103,11 +106,12 @@ function Brand({ brand, compact = false }) {
       to="/investor/dashboard"
       className="relative z-20 mr-2 flex items-center space-x-2 px-2 py-1"
     >
-      <div className="w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center">
-        <TrendingUp className="w-5 h-5 text-white" />
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+        <TrendingUp className="h-5 w-5 text-white" />
       </div>
+
       {!compact && (
-        <span className="font-semibold text-black dark:text-white">
+        <span className="font-semibold text-primary-dark dark:text-bg-light">
           {brand}
         </span>
       )}
@@ -128,7 +132,7 @@ function DesktopNavLinks({ items }) {
       onMouseLeave={() => setHovered(null)}
       className={cn(
         "absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium transition duration-200 lg:flex lg:space-x-2",
-        "text-zinc-600 hover:text-zinc-800"
+        "text-primary-dark/80 hover:text-primary-dark dark:text-bg-light/80 dark:hover:text-bg-light"
       )}
     >
       {items.map((item, idx) => (
@@ -138,14 +142,16 @@ function DesktopNavLinks({ items }) {
           onMouseEnter={() => setHovered(idx)}
           className={({ isActive }) =>
             cn(
-              "relative px-4 py-2 rounded-full",
-              "text-neutral-600 dark:text-neutral-300",
-              isActive && "text-cyan-500 dark:text-cyan-400"
+              "relative rounded-full px-4 py-2 transition",
+              // warna sebelum aktif
+              "text-primary-dark/80 hover:text-primary-dark dark:text-bg-light/80 dark:hover:text-bg-light",
+              // warna saat aktif
+              isActive && "text-accent dark:text-accent font-semibold"
             )
           }
         >
           {hovered === idx && (
-            <div className="absolute inset-0 h-full w-full rounded-full bg-gray-100 dark:bg-neutral-800" />
+            <div className="absolute inset-0 h-full w-full rounded-full bg-bg-light/50 dark:bg-primary/25" />
           )}
           <span className="relative z-20">{item.name}</span>
         </NavLink>

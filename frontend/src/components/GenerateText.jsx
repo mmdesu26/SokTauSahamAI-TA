@@ -1,5 +1,3 @@
-"use client";
-
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 
 export default function GenerateText({

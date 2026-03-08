@@ -1,5 +1,3 @@
-"use client";
-
 import { ShineBorder } from "@/components/ui/shine-border";
 
 export default function ShineBorderWrapper({
@@ -11,8 +9,8 @@ export default function ShineBorderWrapper({
       <ShineBorder
         borderWidth={3.5}
         duration={10}
-        shineColor={["#f18cd8", "#3b82f6", "#0ea5e9"]}
-        />
+        shineColor={["#1C4D8D", "#4988C4", "#BDE8F5"]}
+      />
       {children}
     </div>
   );

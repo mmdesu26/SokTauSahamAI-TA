@@ -27,8 +27,8 @@ const styles: Record<AlertType, { wrap: string; icon: string }> = {
     icon: "text-red-400",
   },
   info: {
-    wrap: "bg-cyan-500/10 border-cyan-500/30 text-cyan-100",
-    icon: "text-cyan-400",
+    wrap: "bg-primary/10 border-primary/30text-bg-light",
+    icon: "text-accent",
   },
   warning: {
     wrap: "bg-amber-500/10 border-amber-500/30 text-amber-100",

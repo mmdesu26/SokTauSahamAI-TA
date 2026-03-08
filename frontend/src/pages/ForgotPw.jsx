@@ -1,16 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Mail,
-  Lock,
-  TrendingUp,
-  AlertCircle,
-  X,
-  Eye,
-  EyeOff,
-} from "lucide-react";
+import { Mail, Lock, TrendingUp, Eye, EyeOff } from "lucide-react";
 
-import GradientSection from "@/components/GradientBg";
+import BoxesWrapper from "@/components/BoxesBg";
 import ShineForm from "@/components/ShineForm";
 import ShineBorderWrapper from "@/components/ShineBorder";
 import Button from "@/components/Button";
@@ -140,22 +132,24 @@ export default function ForgotPassword() {
   };
 
   return (
-    <GradientSection className="min-h-screen flex items-center justify-center px-4">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center mt-8 gap-3 mb-5 justify-center">
-            <div className="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-xl text-white">SokTauSaham</span>
+    <BoxesWrapper className="flex items-center justify-center px-4">
+      <div className="relative w-full max-w-md mx-auto">
+          <div className="text-center mb-3"> 
+          <div className="inline-flex items-center mt-8 gap-3 mb-5 justify-center">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <TrendingUp className="w-6 h-6 text-white" />
           </div>
+          <span className="font-bold text-xl text-bg-light">SokTauSaham</span>
+        </div>
+        </div>
 
         <ShineBorderWrapper>
           <ShineForm
             title="Lupa Password"
             description="Reset password akun Anda"
-            className="bg-slate-900/60 border border-slate-800 backdrop-blur-sm"
+            className="bg-primary-dark/60 border border-primary/20 backdrop-blur-sm"
           >
-            <div className="text-center text-sm text-slate-400 mb-6">
+            <div className="text-center text-sm text-bg-light/70 mb-6">
               Step {step} of {TOTAL_STEPS}
             </div>
 
@@ -172,15 +166,15 @@ export default function ForgotPassword() {
             {step === 1 && (
               <form onSubmit={handleStep1Submit} className="space-y-6 mt-4">
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Email</Label>
+                  <Label className="mb-2 block">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="investor@example.com"
-                      className="pl-10 bg-slate-800/80 border border-slate-700 text-white"
+                      className="pl-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                   </div>
                 </div>
@@ -194,10 +188,10 @@ export default function ForgotPassword() {
             {step === 2 && (
               <form onSubmit={handleStep2Submit} className="space-y-6 mt-4">
                 <div className="text-center">
-                  <p className="text-slate-400 mb-2">
+                  <p className="text-bg-light/70 mb-2">
                     Masukkan kode verifikasi yang dikirim ke:
                   </p>
-                  <p className="text-white font-semibold">{resetEmail}</p>
+                  <p className="text-bg-light font-semibold">{resetEmail}</p>
                 </div>
 
                 <div className="flex justify-center gap-2">
@@ -210,12 +204,12 @@ export default function ForgotPassword() {
                       maxLength={1}
                       value={digit}
                       onChange={(e) => handleOtpChange(i, e.target.value)}
-                      className="w-12 h-12 bg-slate-800 border border-slate-700 text-white text-center rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      className="w-12 h-12 bg-primary-dark/50 border border-primary/25 text-bg-light text-center rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                     />
                   ))}
                 </div>
 
-                <div className="text-center text-sm text-slate-400">
+                <div className="text-center text-sm text-bg-light/70">
                   Kirim ulang dalam {formatTime(timer)}
                   {timer === 0 && (
                     <div className="mt-2">
@@ -223,7 +217,7 @@ export default function ForgotPassword() {
                         type="button"
                         onClick={handleResendOtp}
                         disabled={isResending}
-                        className="text-cyan-400 hover:text-cyan-300 disabled:opacity-50"
+                        className="text-accent hover:text-bg-light disabled:opacity-50"
                       >
                         {isResending ? "Mengirim..." : "Kirim Ulang"}
                       </button>
@@ -240,20 +234,20 @@ export default function ForgotPassword() {
             {step === 3 && (
               <form onSubmit={handleStep3Submit} className="space-y-6 mt-4">
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Password Baru</Label>
+                  <Label className="mb-2 block">Password Baru</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       type={showPassword ? "text" : "password"}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="pl-10 pr-10 bg-slate-800/80 border border-slate-700 text-white"
+                      className="pl-10 pr-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-bg-light/70 hover:text-bg-light"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -261,20 +255,20 @@ export default function ForgotPassword() {
                 </div>
 
                 <div>
-                  <Label className="text-slate-300 mb-2 block">Konfirmasi Password</Label>
+                  <Label className="mb-2 block">Konfirmasi Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-bg-light/60 pointer-events-none" />
                     <Input
                       type={showConfirmPassword ? "text" : "password"}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="pl-10 pr-10 bg-slate-800/80 border border-slate-700 text-white"
+                      className="pl-10 pr-10 bg-primary-dark/50 border border-primary/25 text-bg-light"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-bg-light/70 hover:text-bg-light"
                     >
                       {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -288,13 +282,13 @@ export default function ForgotPassword() {
             )}
 
             <div className="text-center mt-6">
-              <Link to="/login" className="text-slate-400 hover:text-slate-300 text-sm">
+              <Link to="/login" className="text-bg-light/70 hover:text-bg-light text-sm">
                 ← Kembali ke Login
               </Link>
             </div>
           </ShineForm>
         </ShineBorderWrapper>
       </div>
-    </GradientSection>
+    </BoxesWrapper>
   );
 }

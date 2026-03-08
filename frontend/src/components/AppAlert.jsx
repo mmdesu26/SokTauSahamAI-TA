@@ -1,5 +1,3 @@
-"use client";
-
 import { Alert } from "@/components/ui/alert";
 
 export default function AppAlert({
