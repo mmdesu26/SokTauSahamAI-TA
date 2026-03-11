@@ -13,7 +13,7 @@ export default function InvestorLayout() {
   const handleConfirmLogout = () => {
     localStorage.removeItem("user");
     setShowLogoutModal(false);
-    navigate("/login");
+    navigate("/");
   };
 
   const navItems = [
@@ -41,13 +41,12 @@ export default function InvestorLayout() {
                 <AlertCircle className="h-7 w-7 text-red-400" />
               </div>
               <h3 className="text-xl font-semibold text-bg-light">
-                Yakin ingin keluar?
+                Yakin ingin kembali?
               </h3>
             </div>
 
             <p className="mb-8 leading-relaxed text-bg-light/75">
-              Anda akan keluar dari akun dan harus login kembali untuk mengakses
-              platform.
+              Anda akan keluar dari halaman ini.
             </p>
 
             <div className="flex gap-4">
@@ -61,7 +60,7 @@ export default function InvestorLayout() {
                 onClick={handleConfirmLogout}
                 className="flex-1 rounded-xl bg-red-600 px-5 py-3 font-medium text-white transition hover:bg-red-700"
               >
-                Ya, Logout
+                Ya, Kembali
               </button>
             </div>
           </div>

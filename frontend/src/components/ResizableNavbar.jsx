@@ -41,7 +41,7 @@ export default function ResizableNavbarWrapper({
               className="flex items-center gap-2 !text-red-500 hover:!text-red-600 dark:!text-red-400 dark:hover:!text-red-300"
             >
               <LogOut className="h-4 w-4" />
-              Logout
+              Kembali ke Beranda
             </NavbarButton>
           ) : null}
         </div>

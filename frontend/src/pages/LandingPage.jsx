@@ -18,10 +18,6 @@ export default function LandingPage() {
             </div>
             <span className="text-lg font-bold text-bg-light">SokTauSaham</span>
           </div>
-
-          <Link to="/login">
-            <Button>Masuk</Button>
-          </Link>
         </div>
       </nav>
 
@@ -44,7 +40,7 @@ export default function LandingPage() {
             data fundamental berupa rasio, dan rekomendasi trading.
           </p>
 
-          <Link to="/login" className="group relative inline-block">
+          <Link to="/investor/dashboard" className="group relative inline-block">
             <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-primary to-accent opacity-75 blur transition group-hover:opacity-100" />
             <Button>
               <GenerateText text="Mulai Analisis Sekarang ➜" />

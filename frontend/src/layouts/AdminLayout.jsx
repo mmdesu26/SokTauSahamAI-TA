@@ -11,15 +11,17 @@ export default function AdminLayout() {
   const handleLogoutClick = () => setShowLogoutModal(true);
 
   const handleConfirmLogout = () => {
-    localStorage.removeItem("admin");
-    setShowLogoutModal(false);
-    navigate("/login");
-  };
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  setShowLogoutModal(false);
+  navigate("/admin/login");
+};
 
   const navItems = [
     { name: "Dashboard", link: "/admin/dashboard" },
     { name: "Kelola Saham", link: "/admin/datastocks" },
     { name: "Log & Monitoring", link: "/admin/logs" },
+    { name: "Ubah Password", link: "/admin/changepassword" },
   ];
 
   return (
