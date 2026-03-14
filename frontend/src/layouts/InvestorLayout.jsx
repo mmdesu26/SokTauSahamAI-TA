@@ -29,6 +29,7 @@ export default function InvestorLayout() {
           brand="SokTauSaham"
           items={navItems}
           onLogout={handleLogoutClick}
+          logoutText="Kembali ke Beranda"
           className="dark"
         />
       </div>

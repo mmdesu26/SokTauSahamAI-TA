@@ -17,6 +17,7 @@ export default function ResizableNavbarWrapper({
   brand = "SokTauSaham",
   items = defaultItems,
   onLogout,
+  logoutText = "Logout",
   className = "",
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -26,12 +27,12 @@ export default function ResizableNavbarWrapper({
   return (
     <Navbar className={className}>
       {/* DESKTOP */}
-      <NavBody className={cn("dark:bg-transparent", "min-w-[800px]")}>
+      <NavBody className={cn("dark:bg-transparent pl-1 pr-250")}>
         <Brand brand={brand} />
 
         <DesktopNavLinks items={items} />
 
-        <div className="relative z-20 flex items-center gap-2">
+        <div className="absolute right-4 top-1/2 z-20 flex -translate-y-1/2 items-center gap-2">
           {onLogout ? (
             <NavbarButton
               as="button"
@@ -41,7 +42,7 @@ export default function ResizableNavbarWrapper({
               className="flex items-center gap-2 !text-red-500 hover:!text-red-600 dark:!text-red-400 dark:hover:!text-red-300"
             >
               <LogOut className="h-4 w-4" />
-              Kembali ke Beranda
+              {logoutText}
             </NavbarButton>
           ) : null}
         </div>
@@ -90,7 +91,7 @@ export default function ResizableNavbarWrapper({
                 className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-500 transition hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
               >
                 <LogOut className="h-4 w-4" />
-                Logout
+                {logoutText}
               </button>
             </>
           ) : null}
