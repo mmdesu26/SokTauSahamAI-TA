@@ -7,6 +7,7 @@ import AdminLogin from "../pages/admin/Login";
 import AdminDashboard from "../pages/admin/Dashboard";
 import AdminDataStocks from "../pages/admin/DataStocks";
 import AdminLogs from "../pages/admin/Logs";
+import AdminGlossary from "../pages/admin/Glossary";
 import InvestorDashboard from "../pages/investor/Dashboard";
 import InvestorStocks from "../pages/investor/Stocks";
 import InvestorStockDetail from "../pages/investor/StockDetail";
@@ -36,6 +37,7 @@ export default function AppRoutes() {
           <Route path="/admin/datastocks" element={<AdminDataStocks />} />
           <Route path="/admin/logs" element={<AdminLogs />} />
           <Route path="/admin/changepassword" element={<ChangePassword />} />
+          <Route path="/admin/glossary" element={<AdminGlossary />} />
         </Route>
       </Route>
 

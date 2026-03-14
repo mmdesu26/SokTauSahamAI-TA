@@ -3,7 +3,6 @@ import { Activity, Database, Users } from "lucide-react";
 export default function AdminDashboard() {
   const stats = [
     { label: "Total Saham", value: "527", icon: Database },
-    { label: "Active Users", value: "2,345", icon: Users },
   ];
 
   const systemStatus = [
@@ -31,36 +30,6 @@ export default function AdminDashboard() {
           Monitor kesehatan sistem dan kelola data
         </p>
       </section>
-
-
-      {/* Stats */}
-      <section>
-        <div className="grid gap-6 md:grid-cols-2">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-
-            return (
-              <div
-                key={stat.label}
-                className="rounded-2xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm transition hover:shadow-md"
-              >
-                <div className="mb-4 flex justify-between">
-                  <div className="rounded-lg bg-[var(--color-admin)]/15 p-3">
-                    <Icon className="h-6 w-6 text-[var(--color-admin)]" />
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-500">{stat.label}</p>
-
-                <p className="text-3xl font-bold text-gray-800">
-                  {stat.value}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
 
       {/* System Status */}
       <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">

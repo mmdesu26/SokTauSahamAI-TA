@@ -20,6 +20,7 @@ export default function AdminLayout() {
   const navItems = [
     { name: "Dashboard", link: "/admin/dashboard" },
     { name: "Kelola Saham", link: "/admin/datastocks" },
+    { name: "Kelola Glosarium", link: "/admin/glossary" },
     { name: "Log & Monitoring", link: "/admin/logs" },
     { name: "Ubah Password", link: "/admin/changepassword" },
   ];

@@ -33,11 +33,15 @@ def create_app():
     from app.routes.auth_routes import auth_bp
     from app.routes.admin_routes import admin_bp
     from app.routes.investor_routes import investor_bp
+    from app.routes.glossary import glossary_bp
+    from app.routes.stocks import stocks_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(admin_bp, url_prefix="/api/admin")
     app.register_blueprint(investor_bp, url_prefix="/api/investor")
-
+    app.register_blueprint(glossary_bp, url_prefix="/api")
+    app.register_blueprint(stocks_bp, url_prefix="/api")
+    
     @app.route("/api/health")
     def health():
         try:
