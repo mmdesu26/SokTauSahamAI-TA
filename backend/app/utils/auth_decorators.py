@@ -1,7 +1,10 @@
 from functools import wraps
 from flask import request, jsonify, g
 import jwt
+import logging
 from app.utils.jwt_helper import decode_jwt
+
+logger = logging.getLogger(__name__)
 
 def token_required(f):
     @wraps(f)
@@ -20,11 +23,13 @@ def token_required(f):
             payload = decode_jwt(token)
             g.current_user = payload
         except jwt.ExpiredSignatureError:
+            logger.warning("JWT expired")
             return jsonify({
                 "success": False,
                 "message": "Sesi telah berakhir. Silakan login kembali."
             }), 401
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            logger.warning(f"JWT invalid: {str(e)}")
             return jsonify({
                 "success": False,
                 "message": "Token tidak valid."

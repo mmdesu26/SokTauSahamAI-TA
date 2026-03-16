@@ -8,19 +8,24 @@ import {
   X,
   Save,
   Info,
+  AlertCircle,
 } from "lucide-react";
 
-import AppAlert from "@/components/AppAlert";
 import { apiFetch } from "@/lib/api";
+import { useAppAlert } from "@/components/AppAlertContext";
 
 export default function AdminGlossary() {
+  const { showSuccess, showError } = useAppAlert();
+
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [alert, setAlert] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   const [formData, setFormData] = useState({
     term: "",
@@ -41,19 +46,19 @@ export default function AdminGlossary() {
   const fetchGlossary = async () => {
     setIsLoading(true);
 
-    const { ok, data } = await apiFetch("/glossary");
+    try {
+      const { ok, data } = await apiFetch("/glossary");
 
-    if (ok && data.success) {
-      setItems(data.data || []);
-    } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal mengambil data glosarium.",
-      });
+      if (ok && data.success) {
+        setItems(data.data || []);
+      } else {
+        showError(data.message || "Gagal mengambil data glosarium.", "Gagal");
+      }
+    } catch {
+      showError("Terjadi kesalahan saat mengambil data glosarium.", "Gagal");
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -87,10 +92,19 @@ export default function AdminGlossary() {
     resetForm();
   };
 
+  const openDeleteModal = (item) => {
+    setSelectedItem(item);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setSelectedItem(null);
+    setIsDeleteModalOpen(false);
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setAlert(null);
   };
 
   const handleSubmit = async (e) => {
@@ -102,72 +116,63 @@ export default function AdminGlossary() {
     };
 
     if (!payload.term || !payload.definition) {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: "Istilah dan definisi wajib diisi.",
-      });
+      showError("Istilah dan definisi wajib diisi.", "Gagal");
       return;
     }
 
-    let response;
+    try {
+      let response;
 
-    if (editingId) {
-      response = await apiFetch(`/admin/glossary/${editingId}`, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      });
-    } else {
-      response = await apiFetch("/admin/glossary", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    }
+      if (editingId) {
+        response = await apiFetch(`/admin/glossary/${editingId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        response = await apiFetch("/admin/glossary", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
 
-    const { ok, data } = response;
+      const { ok, data } = response;
 
-    if (ok && data.success) {
-      setAlert({
-        type: "success",
-        title: "Berhasil",
-        message: data.message || "Data glosarium berhasil disimpan.",
-      });
-      closeModal();
-      fetchGlossary();
-    } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal menyimpan data glosarium.",
-      });
+      if (ok && data.success) {
+        showSuccess(
+          data.message || "Data glosarium berhasil disimpan.",
+          "Berhasil"
+        );
+        closeModal();
+        fetchGlossary();
+      } else {
+        showError(data.message || "Gagal menyimpan data glosarium.", "Gagal");
+      }
+    } catch {
+      showError("Terjadi kesalahan saat menyimpan data glosarium.", "Gagal");
     }
   };
 
-  const handleDelete = async (id) => {
-    const selected = items.find((item) => item.id === id);
-    const confirmDelete = window.confirm(
-      `Hapus istilah "${selected?.term}" dari glosarium?`
-    );
+  const handleDelete = async () => {
+    if (!selectedItem) return;
 
-    if (!confirmDelete) return;
-
-    const { ok, data } = await apiFetch(`/admin/glossary/${id}`, {
-      method: "DELETE",
-    });
-
-    if (ok && data.success) {
-      setAlert({
-        type: "success",
-        title: "Berhasil",
-        message: data.message || "Data glosarium berhasil dihapus.",
+    try {
+      const { ok, data } = await apiFetch(`/admin/glossary/${selectedItem.id}`, {
+        method: "DELETE",
       });
-      fetchGlossary();
-    } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal menghapus data glosarium.",
-      });
+
+      if (ok && data.success) {
+        showSuccess(
+          data.message || "Data glosarium berhasil dihapus.",
+          "Berhasil"
+        );
+        fetchGlossary();
+      } else {
+        showError(data.message || "Gagal menghapus data glosarium.", "Gagal");
+      }
+    } catch {
+      showError("Terjadi kesalahan saat menghapus data glosarium.", "Gagal");
+    } finally {
+      closeDeleteModal();
     }
   };
 
@@ -201,18 +206,6 @@ export default function AdminGlossary() {
           </button>
         </div>
       </section>
-
-      {alert && (
-        <div>
-          <AppAlert
-            type={alert.type}
-            title={alert.title}
-            message={alert.message}
-            autoHideMs={5000}
-            onDismiss={() => setAlert(null)}
-          />
-        </div>
-      )}
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
@@ -306,7 +299,7 @@ export default function AdminGlossary() {
 
                     <button
                       type="button"
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => openDeleteModal(item)}
                       className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100"
                     >
                       <Trash2 size={16} />
@@ -408,6 +401,46 @@ export default function AdminGlossary() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isDeleteModalOpen && selectedItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--color-admin4)] bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+                <AlertCircle className="h-6 w-6 text-red-500" />
+              </div>
+
+              <h3 className="text-lg font-semibold text-[#222222]">
+                Hapus Istilah?
+              </h3>
+            </div>
+
+            <p className="mb-6 text-[#555555]">
+              Anda yakin ingin menghapus istilah{" "}
+              <span className="font-semibold text-[#222222]">
+                {selectedItem.term}
+              </span>
+              ?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={closeDeleteModal}
+                className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white py-3 text-[#222222] transition hover:bg-[var(--color-admin3)]"
+              >
+                Batal
+              </button>
+
+              <button
+                onClick={handleDelete}
+                className="flex-1 rounded-xl bg-red-500 py-3 text-white transition hover:bg-red-600"
+              >
+                Ya, Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

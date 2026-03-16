@@ -7,31 +7,28 @@
   --color-primary-dark: #0F2854;
   --color-primary: #1C4D8D;
   --color-accent: #4988C4;
-  --color-admin: #81A6C6;
-  --color-admin2: #AACDDC;
-  --color-admin3: #F3E3D0;
-  --color-admin4: #D2C4B4;
+
+  --color-admin:    #5F8ABF;   
+  --color-admin2:   #4988C4;   
+  --color-admin3:   #A5C7E8;  
+  --color-admin4:   #CBD8E9;   
 
   --color-background: var(--color-bg-light);
   --color-foreground: var(--color-primary-dark);
 
-  --color-card: #ffffff;
+  --color-card:       #ffffff;
   --color-card-foreground: var(--color-primary-dark);
 
   --radius-sm: calc(var(--radius) - 4px);
 }
 
-@layer base {
-  body {
-    @apply bg-background text-foreground;  
-  }
-}
-
-/* Dark mode override */
-@layer theme {
-  @variant dark {
-    --color-background: var(--color-primary-dark);
-    --color-foreground: var(--color-bg-light);
-    --color-card: rgba(28, 77, 141, 0.35);
-  }
+/* Dark mode */
+@variant dark {
+  --color-background: var(--color-primary-dark);    
+  --color-foreground: #f1f5f9;
+  --color-card:       rgba(95, 138, 191, 0.15);     
+  --color-admin:      #A5C7E8;                      
+  --color-admin2:     #81A6D6;
+  --color-admin3:     rgba(28, 77, 141, 0.35);
+  --color-admin4:     #334155;
 }

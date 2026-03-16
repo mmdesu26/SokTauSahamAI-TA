@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, ShieldCheck, KeyRound } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Lock, Eye, EyeOff, KeyRound } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-
-import AppAlert from "@/components/AppAlert";
+import { useAppAlert } from "@/components/AppAlertContext";
 
 export default function ChangePassword() {
   const navigate = useNavigate();
+  const { showSuccess, showError, showValidationError } = useAppAlert();
 
   const [formData, setFormData] = useState({
     oldPassword: "",
@@ -17,23 +17,34 @@ export default function ChangePassword() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const [alert, setAlert] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setAlert(null);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      oldPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setAlert(null);
 
     const errors = [];
-    if (!formData.oldPassword.trim()) errors.push("Password lama wajib diisi.");
-    if (!formData.newPassword.trim()) errors.push("Password baru wajib diisi.");
+
+    if (!formData.oldPassword.trim()) {
+      errors.push("Password lama wajib diisi.");
+    }
+
+    if (!formData.newPassword.trim()) {
+      errors.push("Password baru wajib diisi.");
+    }
+
     if (!formData.confirmPassword.trim()) {
       errors.push("Konfirmasi password wajib diisi.");
     }
@@ -50,12 +61,8 @@ export default function ChangePassword() {
       errors.push("Password baru dan konfirmasi password tidak sama.");
     }
 
-    if (errors.length) {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: errors.join(" "),
-      });
+    if (errors.length > 0) {
+      showValidationError(errors, "Validasi Gagal");
       return;
     }
 
@@ -71,13 +78,13 @@ export default function ChangePassword() {
     });
 
     if (ok && data.success) {
-      setAlert({
-        type: "success",
-        title: "Berhasil",
-        message:
-          data.message ||
+      resetForm();
+
+      showSuccess(
+        data.message ||
           "Password berhasil diubah. Silakan login kembali dengan password baru.",
-      });
+        "Berhasil"
+      );
 
       setTimeout(() => {
         localStorage.removeItem("token");
@@ -85,11 +92,7 @@ export default function ChangePassword() {
         navigate("/admin/login", { replace: true });
       }, 1200);
     } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal mengubah password.",
-      });
+      showError(data.message || "Gagal mengubah password.", "Gagal");
     }
 
     setIsLoading(false);
@@ -97,7 +100,6 @@ export default function ChangePassword() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 pb-16">
-      {/* Header */}
       <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-10">
         <div className="flex items-start gap-4">
           <div>
@@ -111,9 +113,7 @@ export default function ChangePassword() {
         </div>
       </section>
 
-      {/* Content */}
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-        {/* Form */}
         <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
           <div className="mb-6 flex items-center gap-3">
             <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
@@ -129,20 +129,7 @@ export default function ChangePassword() {
             </div>
           </div>
 
-          {alert && (
-            <div className="mb-5">
-              <AppAlert
-                type={alert.type}
-                title={alert.title}
-                message={alert.message}
-                autoHideMs={6000}
-                onDismiss={() => setAlert(null)}
-              />
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Password lama */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Password Lama
@@ -155,11 +142,11 @@ export default function ChangePassword() {
                   value={formData.oldPassword}
                   onChange={handleChange}
                   placeholder="Masukkan password lama"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-12 pl-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowOldPassword((v) => !v)}
+                  onClick={() => setShowOldPassword((prev) => !prev)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
                 >
                   {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -167,7 +154,6 @@ export default function ChangePassword() {
               </div>
             </div>
 
-            {/* Password baru */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Password Baru
@@ -180,11 +166,11 @@ export default function ChangePassword() {
                   value={formData.newPassword}
                   onChange={handleChange}
                   placeholder="Masukkan password baru"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-12 pl-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowNewPassword((v) => !v)}
+                  onClick={() => setShowNewPassword((prev) => !prev)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
                 >
                   {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -192,7 +178,6 @@ export default function ChangePassword() {
               </div>
             </div>
 
-            {/* Konfirmasi */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Konfirmasi Password Baru
@@ -205,18 +190,14 @@ export default function ChangePassword() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   placeholder="Ulangi password baru"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-12 pl-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff size={18} />
-                  ) : (
-                    <Eye size={18} />
-                  )}
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
@@ -233,7 +214,6 @@ export default function ChangePassword() {
           </form>
         </div>
 
-        {/* Side info */}
         <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
           <h3 className="mb-4 text-xl font-bold text-gray-800">
             Tips Keamanan
@@ -245,8 +225,7 @@ export default function ChangePassword() {
                 Gunakan kombinasi yang kuat
               </p>
               <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Sebaiknya gunakan kombinasi huruf besar, huruf kecil, angka,
-                dan simbol agar password lebih aman.
+                Sebaiknya gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol agar password lebih aman.
               </p>
             </div>
 
@@ -255,8 +234,7 @@ export default function ChangePassword() {
                 Hindari password lama
               </p>
               <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Jangan gunakan ulang password yang pernah dipakai sebelumnya
-                untuk meminimalkan risiko kebocoran akun.
+                Jangan gunakan ulang password yang pernah dipakai sebelumnya untuk meminimalkan risiko kebocoran akun.
               </p>
             </div>
 
@@ -265,8 +243,7 @@ export default function ChangePassword() {
                 Login ulang setelah perubahan
               </p>
               <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Setelah password berhasil diubah, sistem akan meminta login
-                ulang menggunakan password baru.
+                Setelah password berhasil diubah, sistem akan meminta login ulang menggunakan password baru.
               </p>
             </div>
           </div>

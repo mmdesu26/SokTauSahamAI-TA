@@ -19,20 +19,20 @@ type Props = {
 
 const styles: Record<AlertType, { wrap: string; icon: string }> = {
   success: {
-    wrap: "bg-emerald-500/10 border-emerald-500/30 text-emerald-100",
-    icon: "text-emerald-400",
+    wrap: "bg-emerald-100 border-emerald-400 text-emerald-900",
+    icon: "text-emerald-600",
   },
   error: {
-    wrap: "bg-red-500/10 border-red-500/30 text-red-100",
-    icon: "text-red-400",
+    wrap: "bg-red-100 border-red-400 text-red-900",
+    icon: "text-red-600",
   },
   info: {
-    wrap: "bg-primary/10 border-primary/30text-bg-light",
-    icon: "text-accent",
+    wrap: "bg-blue-100 border-blue-400 text-blue-900",
+    icon: "text-blue-600",
   },
   warning: {
-    wrap: "bg-amber-500/10 border-amber-500/30 text-amber-100",
-    icon: "text-amber-400",
+    wrap: "bg-amber-100 border-amber-400 text-amber-900",
+    icon: "text-amber-600",
   },
 };
 

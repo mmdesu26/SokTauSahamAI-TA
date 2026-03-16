@@ -7,7 +7,8 @@ def generate_jwt(user):
     exp_time = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
 
     payload = {
-        "sub": user.id,
+        "sub": str(user.id),
+        "id": user.id,
         "username": user.username,
         "role": "admin",
         "exp": exp_time

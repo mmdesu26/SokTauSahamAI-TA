@@ -4,15 +4,25 @@ import {
   Edit2,
   Trash2,
   Search,
-  Download,
-  Upload,
   AlertCircle,
   X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import AppAlert from "@/components/AppAlert";
+import { useAppAlert } from "@/components/AppAlertContext";
+
+const INITIAL_FORM = {
+  ticker: "",
+  name: "",
+  sector: "",
+  price: "",
+  change: "",
+  volume: "",
+  status: "Active",
+};
 
 export default function AdminDataStocks() {
+  const { showSuccess, showError } = useAppAlert();
+
   const [stocks, setStocks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -20,18 +30,9 @@ export default function AdminDataStocks() {
   const [selectedStockId, setSelectedStockId] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedStockName, setSelectedStockName] = useState("");
-  const [alert, setAlert] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    ticker: "",
-    name: "",
-    sector: "",
-    price: "",
-    change: "",
-    volume: "",
-    status: "Active",
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -39,32 +40,37 @@ export default function AdminDataStocks() {
 
     return stocks.filter(
       (stock) =>
-        stock.ticker.toLowerCase().includes(q) ||
-        stock.name.toLowerCase().includes(q)
+        String(stock.ticker || "").toLowerCase().includes(q) ||
+        String(stock.name || "").toLowerCase().includes(q)
     );
   }, [searchQuery, stocks]);
 
   const fetchStocks = async () => {
     setIsLoading(true);
 
-    const { ok, data } = await apiFetch("/stocks");
+    try {
+      const { ok, data } = await apiFetch("/stocks");
 
-    if (ok && data.success) {
-      setStocks(data.data || []);
-    } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal mengambil data saham.",
-      });
+      if (ok && data?.success) {
+        setStocks(data.data || []);
+      } else {
+        showError(data?.message || "Gagal mengambil data saham.", "Gagal");
+      }
+    } catch {
+      showError("Terjadi kesalahan saat mengambil data saham.", "Gagal");
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   useEffect(() => {
     fetchStocks();
   }, []);
+
+  const resetForm = () => {
+    setFormData(INITIAL_FORM);
+    setSelectedStockId(null);
+  };
 
   const handleOpenModal = (type, stock = null) => {
     setModalType(type);
@@ -81,22 +87,16 @@ export default function AdminDataStocks() {
       });
       setSelectedStockId(stock.id);
     } else {
-      setFormData({
-        ticker: "",
-        name: "",
-        sector: "",
-        price: "",
-        change: "",
-        volume: "",
-        status: "Active",
-      });
-      setSelectedStockId(null);
+      resetForm();
     }
 
     setShowModal(true);
   };
 
-  const handleCloseModal = () => setShowModal(false);
+  const handleCloseModal = () => {
+    setShowModal(false);
+    resetForm();
+  };
 
   const handleOpenDeleteModal = (stockId, stockName) => {
     setSelectedStockId(stockId);
@@ -104,38 +104,41 @@ export default function AdminDataStocks() {
     setShowDeleteModal(true);
   };
 
-  const handleConfirmDelete = async () => {
-    const { ok, data } = await apiFetch(`/admin/stocks/${selectedStockId}`, {
-      method: "DELETE",
-    });
-
-    if (ok && data.success) {
-      setAlert({
-        type: "success",
-        title: "Berhasil",
-        message: data.message || "Data saham berhasil dihapus.",
-      });
-      fetchStocks();
-    } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal menghapus data saham.",
-      });
-    }
-
+  const handleCloseDeleteModal = () => {
     setShowDeleteModal(false);
     setSelectedStockId(null);
     setSelectedStockName("");
   };
 
-  const handleSave = async () => {
-    if (!formData.ticker.trim() || !formData.name.trim() || !formData.sector.trim()) {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: "Ticker, nama perusahaan, dan sektor wajib diisi.",
+  const handleConfirmDelete = async () => {
+    try {
+      const { ok, data } = await apiFetch(`/admin/stocks/${selectedStockId}`, {
+        method: "DELETE",
       });
+
+      if (ok && data?.success) {
+        showSuccess(data.message || "Data saham berhasil dihapus.", "Berhasil");
+        fetchStocks();
+      } else {
+        showError(data?.message || "Gagal menghapus data saham.", "Gagal");
+      }
+    } catch {
+      showError("Terjadi kesalahan saat menghapus data saham.", "Gagal");
+    } finally {
+      handleCloseDeleteModal();
+    }
+  };
+
+  const handleSave = async () => {
+    if (
+      !formData.ticker.trim() ||
+      !formData.name.trim() ||
+      !formData.sector.trim()
+    ) {
+      showError(
+        "Ticker, nama perusahaan, dan sektor wajib diisi.",
+        "Gagal"
+      );
       return;
     }
 
@@ -143,42 +146,38 @@ export default function AdminDataStocks() {
       ticker: formData.ticker.trim().toUpperCase(),
       name: formData.name.trim(),
       sector: formData.sector.trim(),
-      price: formData.price || 0,
+      price: Number(formData.price || 0),
       change: formData.change || "0.00%",
-      volume: formData.volume || "0",
+      volume: String(formData.volume || "0"),
       status: formData.status || "Active",
     };
 
-    let response;
+    try {
+      let response;
 
-    if (modalType === "edit" && selectedStockId) {
-      response = await apiFetch(`/admin/stocks/${selectedStockId}`, {
-        method: "PUT",
-        body: JSON.stringify(payload),
-      });
-    } else {
-      response = await apiFetch("/admin/stocks", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    }
+      if (modalType === "edit" && selectedStockId) {
+        response = await apiFetch(`/admin/stocks/${selectedStockId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        response = await apiFetch("/admin/stocks", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
 
-    const { ok, data } = response;
+      const { ok, data } = response;
 
-    if (ok && data.success) {
-      setAlert({
-        type: "success",
-        title: "Berhasil",
-        message: data.message || "Data saham berhasil disimpan.",
-      });
-      setShowModal(false);
-      fetchStocks();
-    } else {
-      setAlert({
-        type: "error",
-        title: "Gagal",
-        message: data.message || "Gagal menyimpan data saham.",
-      });
+      if (ok && data?.success) {
+        showSuccess(data.message || "Data saham berhasil disimpan.", "Berhasil");
+        handleCloseModal();
+        fetchStocks();
+      } else {
+        showError(data?.message || "Gagal menyimpan data saham.", "Gagal");
+      }
+    } catch {
+      showError("Terjadi kesalahan saat menyimpan data saham.", "Gagal");
     }
   };
 
@@ -189,19 +188,9 @@ export default function AdminDataStocks() {
           Manajemen Data Saham
         </h1>
         <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
-          Kelola data master saham dengan Create, Read, Update, Delete
+          Kelola data master saham dengan Create, Read, Update, dan Delete
         </p>
       </section>
-
-      {alert && (
-        <AppAlert
-          type={alert.type}
-          title={alert.title}
-          message={alert.message}
-          autoHideMs={5000}
-          onDismiss={() => setAlert(null)}
-        />
-      )}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative mx-auto min-w-[260px] max-w-md flex-1">
@@ -216,16 +205,6 @@ export default function AdminDataStocks() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button className="flex items-center gap-2 rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 font-medium text-[#222222] shadow-sm transition hover:bg-[var(--color-admin3)]">
-            <Download className="h-4 w-4 text-[var(--color-admin)]" />
-            Export
-          </button>
-
-          <button className="flex items-center gap-2 rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 font-medium text-[#222222] shadow-sm transition hover:bg-[var(--color-admin3)]">
-            <Upload className="h-4 w-4 text-[var(--color-admin)]" />
-            Import
-          </button>
-
           <button
             onClick={() => handleOpenModal("add")}
             className="flex items-center gap-2 rounded-xl bg-[var(--color-admin)] px-4 py-3 font-medium text-white shadow-sm transition hover:bg-[var(--color-admin2)] hover:text-[#222222]"
@@ -241,22 +220,43 @@ export default function AdminDataStocks() {
           <table className="w-full min-w-max">
             <thead>
               <tr className="border-b border-[var(--color-admin4)] bg-[var(--color-admin3)]/70">
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Ticker</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Nama Perusahaan</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Sektor</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Harga</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Perubahan</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Volume</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Update Terakhir</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Status</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">Aksi</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Ticker
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Nama Perusahaan
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Sektor
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Harga
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Perubahan
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Volume
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Update Terakhir
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                  Aksi
+                </th>
               </tr>
             </thead>
 
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-10 text-center text-[#666666]">
+                  <td
+                    colSpan={9}
+                    className="px-6 py-10 text-center text-[#666666]"
+                  >
                     Memuat data saham...
                   </td>
                 </tr>
@@ -266,13 +266,25 @@ export default function AdminDataStocks() {
                     key={stock.id}
                     className="border-b border-[var(--color-admin4)]/60 transition hover:bg-[var(--color-admin3)]/60"
                   >
-                    <td className="px-6 py-4 font-semibold text-[#222222]">{stock.ticker}</td>
+                    <td className="px-6 py-4 font-semibold text-[#222222]">
+                      {stock.ticker}
+                    </td>
                     <td className="px-6 py-4 text-[#222222]">{stock.name}</td>
-                    <td className="px-6 py-4 text-[#666666]">{stock.sector}</td>
-                    <td className="px-6 py-4 text-[#222222]">Rp {stock.price}</td>
-                    <td className="px-6 py-4 text-[#666666]">{stock.change}</td>
-                    <td className="px-6 py-4 text-[#666666]">{stock.volume}</td>
-                    <td className="px-6 py-4 text-sm text-[#666666]">{stock.lastUpdated}</td>
+                    <td className="px-6 py-4 text-[#666666]">
+                      {stock.sector}
+                    </td>
+                    <td className="px-6 py-4 text-[#222222]">
+                      Rp {stock.price}
+                    </td>
+                    <td className="px-6 py-4 text-[#666666]">
+                      {stock.change}
+                    </td>
+                    <td className="px-6 py-4 text-[#666666]">
+                      {stock.volume}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-[#666666]">
+                      {stock.lastUpdated}
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-full border px-3 py-1 text-xs font-medium ${
@@ -295,7 +307,9 @@ export default function AdminDataStocks() {
                         </button>
 
                         <button
-                          onClick={() => handleOpenDeleteModal(stock.id, stock.ticker)}
+                          onClick={() =>
+                            handleOpenDeleteModal(stock.id, stock.ticker)
+                          }
                           className="rounded-lg p-2 text-red-500 transition hover:bg-red-500/15"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -306,7 +320,10 @@ export default function AdminDataStocks() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={9} className="px-6 py-10 text-center text-[#666666]">
+                  <td
+                    colSpan={9}
+                    className="px-6 py-10 text-center text-[#666666]"
+                  >
                     Tidak ada data saham yang ditemukan
                   </td>
                 </tr>
@@ -474,7 +491,7 @@ export default function AdminDataStocks() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setShowDeleteModal(false)}
+                onClick={handleCloseDeleteModal}
                 className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white py-3 text-[#222222] transition hover:bg-[var(--color-admin3)]"
               >
                 Batal

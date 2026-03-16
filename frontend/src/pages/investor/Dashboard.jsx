@@ -1,30 +1,39 @@
-import { TrendingUp, TrendingDown, ArrowRight, Coins, Landmark } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  Coins,
+  Landmark,
+} from "lucide-react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "@/lib/api";
 
 export default function InvestorDashboard() {
-  const topStocks = [
-    {
-      ticker: "BBCA",
-      name: "Bank Central Asia",
-      price: "9,450",
-      change: "+2.34%",
-      positive: true,
-    },
-    {
-      ticker: "BMRI",
-      name: "Bank Mandiri",
-      price: "6,775",
-      change: "+1.87%",
-      positive: true,
-    },
-    {
-      ticker: "BBRI",
-      name: "Bank Rakyat Indonesia",
-      price: "8,200",
-      change: "-0.45%",
-      positive: false,
-    },
-  ];
+  const [stocks, setStocks] = useState([]);
+  const [isLoadingStocks, setIsLoadingStocks] = useState(true);
+
+  const fetchStocks = async () => {
+    setIsLoadingStocks(true);
+
+    const { ok, data } = await apiFetch("/stocks?status=Active");
+
+    if (ok && data.success) {
+      setStocks(data.data || []);
+    } else {
+      setStocks([]);
+    }
+
+    setIsLoadingStocks(false);
+  };
+
+  useEffect(() => {
+    fetchStocks();
+  }, []);
+
+  const topStocks = useMemo(() => {
+    return stocks.slice(0, 3);
+  }, [stocks]);
 
   return (
     <div className="w-full space-y-12">
@@ -50,9 +59,10 @@ export default function InvestorDashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* IHSG */}
           <div className="rounded-3xl border border-slate-700/80 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-slate-500/70">
-            <p className="mb-3 text-sm font-medium text-slate-400">IHSG Hari Ini</p>
+            <p className="mb-3 text-sm font-medium text-slate-400">
+              IHSG Hari Ini
+            </p>
             <div className="flex items-end justify-between">
               <div>
                 <p className="text-4xl font-bold tracking-tight text-white md:text-5xl">
@@ -66,9 +76,10 @@ export default function InvestorDashboard() {
             </div>
           </div>
 
-          {/* Harga Emas */}
           <div className="rounded-3xl border border-slate-700/80 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-slate-500/70">
-            <p className="mb-3 text-sm font-medium text-slate-400">Harga Emas</p>
+            <p className="mb-3 text-sm font-medium text-slate-400">
+              Harga Emas
+            </p>
             <div className="flex items-end justify-between">
               <div>
                 <p className="text-4xl font-bold tracking-tight text-white md:text-5xl">
@@ -83,7 +94,6 @@ export default function InvestorDashboard() {
             </div>
           </div>
 
-          {/* BI Rate */}
           <div className="rounded-3xl border border-slate-700/80 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-slate-500/70">
             <p className="mb-3 text-sm font-medium text-slate-400">BI Rate</p>
             <div className="flex items-end justify-between">
@@ -94,7 +104,9 @@ export default function InvestorDashboard() {
                 <p className="mt-2 text-base font-medium text-sky-400">
                   Tetap dari RDG sebelumnya
                 </p>
-                <p className="mt-1 text-xs text-slate-500">per 19 Februari 2026</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  per 19 Februari 2026
+                </p>
               </div>
               <Landmark className="h-16 w-16 text-cyan-400/25" />
             </div>
@@ -117,43 +129,59 @@ export default function InvestorDashboard() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {topStocks.map((stock) => (
-            <Link
-              key={stock.ticker}
-              to={`/investor/stocks/${stock.ticker}`}
-              className="group rounded-3xl border border-slate-800 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-[#4988C4]/60 hover:shadow-xl hover:shadow-[#1C4D8D]/25"
-            >
-              <div className="mb-5 flex items-start justify-between">
-                <div>
-                  <p className="text-2xl font-bold text-white transition-colors group-hover:text-[#BDE8F5]">
-                    {stock.ticker}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-400">{stock.name}</p>
-                </div>
+        {isLoadingStocks ? (
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-10 text-center text-slate-400 backdrop-blur-md">
+            Memuat data saham...
+          </div>
+        ) : topStocks.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {topStocks.map((stock) => {
+              const isPositive = (stock.change || "").includes("+");
 
-                {stock.positive ? (
-                  <TrendingUp className="mt-1 h-7 w-7 text-green-500" />
-                ) : (
-                  <TrendingDown className="mt-1 h-7 w-7 text-red-500" />
-                )}
-              </div>
-
-              <div className="flex items-baseline justify-between">
-                <p className="text-3xl font-semibold text-white">
-                  Rp {stock.price}
-                </p>
-                <p
-                  className={`text-lg font-medium ${
-                    stock.positive ? "text-green-400" : "text-red-400"
-                  }`}
+              return (
+                <Link
+                  key={stock.id}
+                  to={`/investor/stocks/${stock.ticker}`}
+                  className="group rounded-3xl border border-slate-800 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-[#4988C4]/60 hover:shadow-xl hover:shadow-[#1C4D8D]/25"
                 >
-                  {stock.change}
-                </p>
-              </div>
-            </Link>
-          ))}
-        </div>
+                  <div className="mb-5 flex items-start justify-between">
+                    <div>
+                      <p className="text-2xl font-bold text-white transition-colors group-hover:text-[#BDE8F5]">
+                        {stock.ticker}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {stock.name}
+                      </p>
+                    </div>
+
+                    {isPositive ? (
+                      <TrendingUp className="mt-1 h-7 w-7 text-green-500" />
+                    ) : (
+                      <TrendingDown className="mt-1 h-7 w-7 text-red-500" />
+                    )}
+                  </div>
+
+                  <div className="flex items-baseline justify-between">
+                    <p className="text-3xl font-semibold text-white">
+                      Rp {stock.price}
+                    </p>
+                    <p
+                      className={`text-lg font-medium ${
+                        isPositive ? "text-green-400" : "text-red-400"
+                      }`}
+                    >
+                      {stock.change}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-10 text-center text-slate-400 backdrop-blur-md">
+            Belum ada data saham aktif.
+          </div>
+        )}
       </section>
 
       {/* Tips */}
