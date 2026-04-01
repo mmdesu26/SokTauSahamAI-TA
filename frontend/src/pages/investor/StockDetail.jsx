@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { TrendingUp, AlertTriangle } from "lucide-react";
-import ReactApexChart from "react-apexcharts";
 
 import Button from "@/components/Button";
+import StockCandleChart from "@/components/StockCandleChart";
 import { apiFetch } from "@/lib/api";
 
 function formatIDR(n) {
@@ -12,78 +12,185 @@ function formatIDR(n) {
 }
 
 function formatPercent(n) {
-  if (!Number.isFinite(Number(n))) return "0%";
+  if (!Number.isFinite(Number(n))) return "0.0%";
   return `${Number(n).toFixed(1)}%`;
+}
+
+function parseLocalDateTime(value) {
+  if (!value) return null;
+
+  const raw = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+
+  if (!Number.isNaN(date.getTime())) {
+    return date;
+  }
+
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute, second = "0"] = match;
+  return new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  );
+}
+
+function formatLocalDate(value) {
+  const date = parseLocalDateTime(value);
+  if (!date) return value || "-";
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatLocalDateTime(value) {
+  const date = parseLocalDateTime(value);
+  if (!date) return value || "-";
+
+  return `${new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)} WIB`;
+}
+
+function formatChartUpdate(value, timeframe) {
+  if (!value) return "-";
+  return timeframe === "1D" ? formatLocalDateTime(value) : formatLocalDate(value);
+}
+
+function formatChartIntervalLabel(interval, timeframe) {
+  if (timeframe === "1D") return "Per jam";
+  if (timeframe === "7D") return "Per hari (7 hari)";
+  if (timeframe === "1M") return "Per hari (1 bulan)";
+  return interval || "-";
 }
 
 export default function InvestorStockDetail() {
   const { ticker = "" } = useParams();
 
   const [timeframe, setTimeframe] = useState("1D");
-  const [activeTab, setActiveTab] = useState(null);
-  const [chartReady, setChartReady] = useState(false);
+
+  // default tab langsung ke deskripsi biar pas buka ga kosong
+  const [activeTab, setActiveTab] = useState("deskripsi");
+
   const [isLoading, setIsLoading] = useState(true);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [isFundamentalsLoading, setIsFundamentalsLoading] = useState(false);
 
   const [stockData, setStockData] = useState(null);
-
-  const chartContainerRef = useRef(null);
-
-  useEffect(() => {
-    const checkSize = () => {
-      if (!chartContainerRef.current) return;
-      const { width, height } = chartContainerRef.current.getBoundingClientRect();
-      if (width > 10 && height > 10) setChartReady(true);
-    };
-
-    checkSize();
-
-    const observer = new ResizeObserver(checkSize);
-    if (chartContainerRef.current) observer.observe(chartContainerRef.current);
-
-    const timer = setTimeout(checkSize, 500);
-
-    return () => {
-      if (chartContainerRef.current) observer.unobserve(chartContainerRef.current);
-      clearTimeout(timer);
-    };
-  }, []);
+  const [predictionData, setPredictionData] = useState(null);
+  const [fundamentalsData, setFundamentalsData] = useState(null);
 
   useEffect(() => {
+    // kalau pindah ticker, balikin lagi ke tab deskripsi
+    setActiveTab("deskripsi");
+
     const fetchStockDetail = async () => {
       setIsLoading(true);
 
-      const { ok, data } = await apiFetch(`/stocks/${ticker}/detail?timeframe=${timeframe}`);
+      try {
+        const detailRes = await apiFetch(`/stocks/${ticker}/detail?timeframe=${timeframe}`);
+        const chartRes = await apiFetch(`/stocks/${ticker}/candlestick?timeframe=${timeframe}`);
 
-      if (ok && data.success) {
-        setStockData(data.data);
-      } else {
+        if (detailRes.ok && detailRes.data?.success) {
+          const nextData = detailRes.data.data || {};
+
+          nextData.chart =
+            chartRes.ok && chartRes.data?.success
+              ? chartRes.data.data || []
+              : nextData.chart || [];
+
+          nextData.chartMeta =
+            chartRes.ok && chartRes.data?.success
+              ? {
+                  source: chartRes.data.source || nextData.chartMeta?.source || "yfinance",
+                  latestDate: chartRes.data.latestDate || nextData.chartMeta?.latestDate || null,
+                  latestUpdated:
+                    chartRes.data.latestUpdated || nextData.chartMeta?.latestUpdated || null,
+                  interval: chartRes.data.interval || nextData.chartMeta?.interval || "60m",
+                }
+              : nextData.chartMeta || null;
+
+          setStockData(nextData);
+        } else {
+          setStockData(null);
+        }
+      } catch (error) {
+        console.error("Error fetching stock detail:", error);
         setStockData(null);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
-    if (ticker) {
-      fetchStockDetail();
-    }
+    if (ticker) fetchStockDetail();
   }, [ticker, timeframe]);
+
+  const handlePrediction = async () => {
+    if (!ticker) return;
+
+    setIsPredicting(true);
+
+    try {
+      const { ok, data } = await apiFetch(`/stocks/${ticker}/prediction`);
+      setPredictionData(ok && data.success ? data.data : null);
+    } catch (error) {
+      console.error("Error fetching prediction:", error);
+      setPredictionData(null);
+    } finally {
+      setIsPredicting(false);
+    }
+  };
+
+  const handleFundamentalsLoad = async () => {
+    if (!ticker) return;
+
+    setIsFundamentalsLoading(true);
+
+    try {
+      const { ok, data } = await apiFetch(`/stocks/${ticker}/fundamentals`);
+      setFundamentalsData(ok && data.success ? data.data : null);
+    } catch (error) {
+      console.error("Error fetching fundamentals:", error);
+      setFundamentalsData(null);
+    } finally {
+      setIsFundamentalsLoading(false);
+    }
+  };
 
   const profile = stockData?.profile || {};
   const fundamental = stockData?.fundamental || {};
   const chart = stockData?.chart || [];
   const stock = stockData?.stock || {};
+  const chartMeta = stockData?.chartMeta || {};
 
-  const candles = useMemo(
-    () =>
-      chart.map((c) => ({
-        t: String(c.t),
-        open: Number(c.open),
-        high: Number(c.high),
-        low: Number(c.low),
-        close: Number(c.close),
-      })),
-    [chart]
-  );
+  const candles = useMemo(() => {
+    return chart.map((c) => ({
+      t: String(c.t),
+      open: Number(c.open),
+      high: Number(c.high),
+      low: Number(c.low),
+      close: Number(c.close),
+    }));
+  }, [chart]);
 
   const first = candles[0] || { open: 0 };
   const last = candles[candles.length - 1] || { close: 0 };
@@ -105,63 +212,15 @@ export default function InvestorStockDetail() {
         : "bg-blue-800/50 text-slate-300 hover:bg-slate-700/60"
     }`;
 
-  const chartOptions = useMemo(
-    () => ({
-      chart: {
-        type: "candlestick",
-        height: "100%",
-        background: "transparent",
-        toolbar: { show: true },
-        zoom: { enabled: true },
-        foreColor: "#e2e8f0",
-      },
-      title: {
-        text: `${ticker.toUpperCase()} - Chart Harga`,
-        align: "left",
-        style: { color: "#e2e8f0", fontSize: "16px" },
-      },
-      xaxis: {
-        type: "category",
-        labels: { style: { colors: "#94a3b8" } },
-      },
-      yaxis: {
-        tooltip: { enabled: true },
-        labels: { style: { colors: "#94a3b8" } },
-      },
-      tooltip: {
-        theme: "dark",
-      },
-      plotOptions: {
-        candlestick: {
-          colors: { upward: "#22c55e", downward: "#ef4444" },
-          wick: { useFillColor: true },
-        },
-      },
-      grid: {
-        borderColor: "rgba(148,163,184,0.1)",
-        strokeDashArray: 3,
-      },
-    }),
-    [ticker]
-  );
-
-  const chartSeries = useMemo(
-    () => [
-      {
-        name: "Candlestick",
-        data: candles.map((c) => ({
-          x: c.t,
-          y: [c.open, c.high, c.low, c.close],
-        })),
-      },
-    ],
-    [candles]
-  );
-
-  const closeToday = Number(last.close || 0);
-  const predClose1Mo = closeToday * 1.08;
+  const closeToday = predictionData?.current_price || Number(last.close || 0);
+  const predClose1Mo = predictionData?.predicted_close_1m || closeToday;
   const predDelta = predClose1Mo - closeToday;
-  const predPct = closeToday === 0 ? 0 : (predDelta / closeToday) * 100;
+  const predPct =
+    predictionData?.expected_change_pct ||
+    (closeToday === 0 ? 0 : (predDelta / closeToday) * 100);
+
+  const rmse = predictionData?.rmse || 0;
+  const mse = predictionData?.mse || 0;
   const trendDirection = predClose1Mo > closeToday ? "Naik" : "Turun";
 
   const recommendation = useMemo(() => {
@@ -180,6 +239,8 @@ export default function InvestorStockDetail() {
     return "border-red-500/25 bg-red-500/15 text-red-300";
   }, [recommendation]);
 
+  const fundamentalsRatios = fundamentalsData?.fundamentals?.ratios || {};
+  const fundamentalsRawData = fundamentalsData?.fundamentals?.rawData || {};
   const benchmarks = fundamental?.benchmarks || {};
 
   const valuation = useMemo(() => {
@@ -191,8 +252,6 @@ export default function InvestorStockDetail() {
     const pbvBench = Number(benchmarks?.pbv || 0);
     const roeBench = Number(benchmarks?.roe || 0);
 
-    const perOver = perBench > 0 ? perTTM >= perBench * 1.1 : false;
-    const pbvOver = pbvBench > 0 ? pbv >= pbvBench * 1.1 : false;
     const cheapSignal =
       perBench > 0 &&
       pbvBench > 0 &&
@@ -202,7 +261,15 @@ export default function InvestorStockDetail() {
       roe >= roeBench;
 
     if (cheapSignal) return { label: "Cenderung Murah", tone: "good" };
-    if (perOver || pbvOver) return { label: "Cenderung Mahal", tone: "bad" };
+
+    if (
+      perBench > 0 &&
+      pbvBench > 0 &&
+      (perTTM >= perBench * 1.1 || pbv >= pbvBench * 1.1)
+    ) {
+      return { label: "Cenderung Mahal", tone: "bad" };
+    }
+
     return { label: "Wajar", tone: "mid" };
   }, [fundamental, benchmarks]);
 
@@ -242,19 +309,23 @@ export default function InvestorStockDetail() {
               <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
                 {ticker.toUpperCase()}
               </h1>
-              <p className="mt-1 text-xl text-slate-300">
-                {profile.longName || stock.name}
-              </p>
+              <p className="mt-1 text-xl text-slate-300">{profile.longName || stock.name}</p>
               <p className="text-lg text-cyan-300/80">
                 {profile.sector || stock.sector} • {profile.industry || "-"}
               </p>
             </div>
           </div>
 
-          <div className="min-w-[180px]">
-            <p className="text-right text-xs text-slate-300/80">Source: Database Internal</p>
-            <p className="text-right text-xs text-slate-300/80">
-              Harga update: {stock.lastUpdated || "-"}
+          <div className="min-w-[220px] text-right">
+            <p className="text-xs text-slate-300/80">Source: {chartMeta.source || "yfinance"}</p>
+            <p className="text-xs text-slate-300/80">
+              Tanggal data terbaru: {formatLocalDate(chartMeta.latestDate)}
+            </p>
+            <p className="text-xs text-slate-300/80">
+              Update terakhir: {formatChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
+            </p>
+            <p className="mt-1 text-xs text-amber-200/90">
+              {chartMeta.note || "Data ini bukan harga realtime dan hanya visualisasi historis dari yfinance, tidak terkait harga prediksi."}
             </p>
           </div>
         </div>
@@ -264,37 +335,37 @@ export default function InvestorStockDetail() {
             <p className="text-sm text-slate-400">Open</p>
             <p className="text-xl font-semibold text-white">{first.open}</p>
           </div>
+
           <div>
             <p className="text-sm text-slate-400">High</p>
             <p className="text-xl font-semibold text-white">
               {candles.length ? Math.max(...candles.map((c) => c.high)) : 0}
             </p>
           </div>
+
           <div>
             <p className="text-sm text-slate-400">Low</p>
             <p className="text-xl font-semibold text-white">
               {candles.length ? Math.min(...candles.map((c) => c.low)) : 0}
             </p>
           </div>
+
           <div>
             <p className="text-sm text-slate-400">Close</p>
             <p className="text-xl font-semibold text-white">{last.close}</p>
           </div>
+
           <div>
             <p className="text-sm text-slate-400">Perubahan</p>
-            <p
-              className={`text-xl font-bold ${
-                change >= 0 ? "text-emerald-300" : "text-red-300"
-              }`}
-            >
+            <p className={`text-xl font-bold ${change >= 0 ? "text-emerald-300" : "text-red-300"}`}>
               {change >= 0 ? "+" : ""}
-              {change.toFixed(0)} ({pct.toFixed(1)}%)
+              {change.toFixed(0)} ({formatPercent(pct)})
             </p>
           </div>
         </div>
 
         <div className="mt-6 flex flex-wrap justify-center gap-3 md:justify-start">
-          {["1D", "1W", "1M", "3M", "1Y"].map((value) => (
+          {["1D", "7D", "1M"].map((value) => (
             <button
               key={value}
               type="button"
@@ -309,19 +380,18 @@ export default function InvestorStockDetail() {
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-6 backdrop-blur-md">
         <p className="ml-2.5 text-left text-xs text-slate-200/70">
-          Harga update: {stock.lastUpdated || "-"}
+          Source: {chartMeta.source || "yfinance"} • Interval: {formatChartIntervalLabel(chartMeta.interval, timeframe)} • Update terbaru: {formatChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
         </p>
-        <div ref={chartContainerRef} className="relative h-80 md:h-[420px]">
-          {chartReady ? (
-            <ReactApexChart
-              options={chartOptions}
-              series={chartSeries}
-              type="candlestick"
-              height="100%"
-            />
+        <p className="ml-2.5 mt-1 text-left text-xs text-amber-200/90">
+          Data ini bukan harga realtime dan grafik hanya visualisasi historis dari yfinance, bukan harga prediksi.
+        </p>
+
+        <div className="relative h-80 md:h-[420px]">
+          {candles.length ? (
+            <StockCandleChart data={candles} timeframe={timeframe} />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-slate-500">
-              Memuat chart...
+              Tidak ada data candlestick OHLC terbaru.
             </div>
           )}
         </div>
@@ -329,19 +399,23 @@ export default function InvestorStockDetail() {
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-6 backdrop-blur-md">
         <Button
-          onClick={() =>
-            setActiveTab(activeTab === "prediksi" ? null : "prediksi")
-          }
+          onClick={() => {
+            if (activeTab === "prediksi") {
+              setActiveTab(null);
+            } else {
+              setActiveTab("prediksi");
+              if (!predictionData) handlePrediction();
+            }
+          }}
+          disabled={isPredicting}
         >
-          Prediksi Saham
+          {isPredicting ? "Memproses Prediksi..." : "Prediksi Saham"}
         </Button>
 
         <div className="mt-6 mb-6 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() =>
-              setActiveTab(activeTab === "deskripsi" ? null : "deskripsi")
-            }
+            onClick={() => setActiveTab(activeTab === "deskripsi" ? null : "deskripsi")}
             className={tabBtnClass("deskripsi")}
           >
             Deskripsi Perusahaan
@@ -349,12 +423,18 @@ export default function InvestorStockDetail() {
 
           <button
             type="button"
-            onClick={() =>
-              setActiveTab(activeTab === "fundamental" ? null : "fundamental")
-            }
+            onClick={() => {
+              if (activeTab === "fundamental") {
+                setActiveTab(null);
+              } else {
+                setActiveTab("fundamental");
+                if (!fundamentalsData) handleFundamentalsLoad();
+              }
+            }}
             className={tabBtnClass("fundamental")}
+            disabled={isFundamentalsLoading}
           >
-            Fundamental
+            {isFundamentalsLoading ? "Memuat..." : "Fundamental"}
           </button>
         </div>
 
@@ -362,100 +442,168 @@ export default function InvestorStockDetail() {
           <div className="mt-4 animate-fade-in">
             {activeTab === "prediksi" && (
               <div className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-6">
-                    <h3 className="mb-3 text-lg font-semibold text-cyan-200">
-                      Harga Perkiraan Closing (1 Bulan)
-                    </h3>
-
-                    <div className="space-y-2 text-slate-300">
-                      <div className="flex items-center justify-between">
-                        <span>Harga sekarang (Close)</span>
-                        <span className="font-semibold text-white">
-                          {formatIDR(closeToday)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span>Prediksi closing 1 bulan</span>
-                        <span className="font-semibold text-white">
-                          {formatIDR(predClose1Mo)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span>Selisih</span>
-                        <span
-                          className={`font-bold ${
-                            predDelta >= 0 ? "text-emerald-300" : "text-red-300"
-                          }`}
-                        >
-                          {predDelta >= 0 ? "+" : ""}
-                          {formatIDR(predDelta)} ({predPct >= 0 ? "+" : ""}
-                          {predPct.toFixed(2)}%)
-                        </span>
-                      </div>
-                    </div>
+                {isPredicting ? (
+                  <div className="py-12 text-center text-slate-400">
+                    Menjalankan prediksi pakai Random Forest + Linear Regression dari data OHLC
+                    historis dan rasio fundamental...
                   </div>
-
-                  <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-6">
-                    <h3 className="mb-3 text-lg font-semibold text-cyan-200">
-                      Arah Tren & Rekomendasi
-                    </h3>
-
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="text-slate-300">Arah tren</span>
-                      <span
-                        className={`rounded-full border px-4 py-1 font-semibold ${
-                          trendDirection === "Naik"
-                            ? "border-emerald-500/25 bg-emerald-500/15 text-emerald-300"
-                            : "border-red-500/25 bg-red-500/15 text-red-300"
-                        }`}
-                      >
-                        {trendDirection}
-                      </span>
+                ) : !predictionData ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <p>Prediksi belum dijalankan</p>
+                    <button
+                      onClick={handlePrediction}
+                      className="mt-4 rounded-lg bg-cyan-600/30 px-6 py-2 text-cyan-200 transition hover:bg-cyan-600/40"
+                    >
+                      Jalankan Prediksi Sekarang
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* ini header buat hasil prediksi */}
+                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-6 py-4 text-center">
+                      <h2 className="text-xl font-bold text-cyan-200 md:text-2xl">
+                        Hasil Prediksi Harga Closing dan Arah Tren 1 Bulan Kedepan
+                      </h2>
                     </div>
 
-                    <div className="mb-4 flex items-center justify-between">
-                      <span className="text-slate-300">Rekomendasi</span>
-                      <span
-                        className={`rounded-full border px-4 py-1 font-semibold ${recommendationPillClass}`}
-                      >
-                        {recommendation}
-                      </span>
+                    {/* hasil prediksi dibikin turun ke bawah semua */}
+                    <div className="flex w-full flex-col gap-6">
+                      <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
+                        <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
+                          Harga Perkiraan Closing 
+                        </h3>
+
+                        <div className="space-y-3 text-slate-300">
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Harga sekarang (Close)</span>
+                            <span className="text-right font-semibold text-white">
+                              {formatIDR(closeToday)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Prediksi closing 1 bulan</span>
+                            <span className="text-right font-semibold text-white">
+                              {formatIDR(predClose1Mo)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Selisih</span>
+                            <span
+                              className={`text-right font-bold ${
+                                predDelta >= 0 ? "text-emerald-300" : "text-red-300"
+                              }`}
+                            >
+                              {predDelta >= 0 ? "+" : ""}
+                              {formatIDR(predDelta)} ({predPct >= 0 ? "+" : ""}
+                              {predPct.toFixed(2)}%)
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Random Forest</span>
+                            <span className="text-right font-semibold text-white">
+                              {formatIDR(predictionData?.rf_prediction)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Linear Regression</span>
+                            <span className="text-right font-semibold text-white">
+                              {formatIDR(predictionData?.lr_prediction)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
+                        <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
+                          Arah Tren & Rekomendasi
+                        </h3>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-slate-300">Arah tren</span>
+                            <span
+                              className={`rounded-full border px-4 py-1 font-semibold ${
+                                trendDirection === "Naik"
+                                  ? "border-emerald-500/25 bg-emerald-500/15 text-emerald-300"
+                                  : "border-red-500/25 bg-red-500/15 text-red-300"
+                              }`}
+                            >
+                              {trendDirection}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-slate-300">Rekomendasi</span>
+                            <span
+                              className={`rounded-full border px-4 py-1 font-semibold ${recommendationPillClass}`}
+                            >
+                              {recommendation}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 pt-2 text-sm leading-relaxed text-slate-400">
+                            <p>Model: Random Forest + Linear Regression</p>
+                            <p>Rasio yfinance: PER, EPS, PBV, ROE</p>
+                            <p>Tidak pakai indikator teknikal tambahan.</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
+                        <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
+                          Metrik Akurasi Model ML
+                        </h3>
+
+                        <div className="space-y-3 text-slate-300">
+                          <div className="flex items-center justify-between gap-4">
+                            <span>RMSE</span>
+                            <span className="text-right font-semibold text-white">
+                              {rmse.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>MSE</span>
+                            <span className="text-right font-semibold text-white">
+                              {mse.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Waktu Prediksi</span>
+                            <span className="text-right font-semibold text-white">
+                              {predictionData?.prediction_date || "-"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-5 text-slate-200">
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+
+                        <div>
+                          <p className="font-semibold text-amber-200">Disclaimer</p>
+                          <p className="mt-1 text-sm leading-relaxed text-slate-300/90">
+                            Prediksi ini pakai Random Forest dan Linear Regression dengan input
+                            OHLC historis tertutup serta rasio fundamental dari yfinance. Hasil
+                            bukan kepastian dan bukan rekomendasi investasi.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-
-                    <p className="text-sm leading-relaxed text-slate-400">
-                      Aturan:
-                      <br />
-                      BUY jika prediksi &gt; +3%
-                      <br />
-                      HOLD jika antara -3% s/d +3%
-                      <br />
-                      SELL jika &lt; -3%
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-5 text-slate-200">
-                  <div className="mt-0.5">
-                    <AlertTriangle className="h-5 w-5 text-amber-300" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-amber-200">Disclaimer</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-300/90">
-                      Prediksi ini dihasilkan dari model sederhana dan bertujuan membantu analisis.
-                      Hasil prediksi bukan kepastian dan tidak bisa dijadikan satu-satunya dasar keputusan investasi.
-                    </p>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             )}
 
             {activeTab === "deskripsi" && (
               <div className="space-y-6">
                 <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-6">
-                  <h3 className="mb-4 text-xl font-semibold text-white">
+                  <h3 className="mb-4 text-xl font-semibold text-white text-center">
                     Profil Perusahaan
                   </h3>
 
@@ -467,21 +615,24 @@ export default function InvestorStockDetail() {
                           {profile.longName || "-"}
                         </span>
                       </div>
+
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-slate-400">Nama (Short)</span>
-                        <span className="font-semibold text-white">
+                        <span className="text-right font-semibold text-white">
                           {profile.shortName || "-"}
                         </span>
                       </div>
+
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-slate-400">Sektor</span>
-                        <span className="font-semibold text-white">
+                        <span className="text-right font-semibold text-white">
                           {profile.sector || "-"}
                         </span>
                       </div>
+
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-slate-400">Industri</span>
-                        <span className="font-semibold text-white">
+                        <span className="text-right font-semibold text-white">
                           {profile.industry || "-"}
                         </span>
                       </div>
@@ -492,10 +643,10 @@ export default function InvestorStockDetail() {
                         <span className="text-slate-400">Website</span>
                         {profile.website ? (
                           <a
-                            className="text-right text-cyan-200 underline underline-offset-4 hover:text-cyan-100"
                             href={profile.website}
                             target="_blank"
                             rel="noreferrer"
+                            className="text-right text-cyan-200 underline hover:text-cyan-100"
                           >
                             {profile.website.replace("https://", "")}
                           </a>
@@ -503,15 +654,17 @@ export default function InvestorStockDetail() {
                           <span className="font-semibold text-white">-</span>
                         )}
                       </div>
+
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-slate-400">Kota</span>
-                        <span className="font-semibold text-white">
+                        <span className="text-right font-semibold text-white">
                           {profile.city || "-"}
                         </span>
                       </div>
+
                       <div className="flex items-center justify-between gap-4">
                         <span className="text-slate-400">Negara</span>
-                        <span className="font-semibold text-white">
+                        <span className="text-right font-semibold text-white">
                           {profile.country || "-"}
                         </span>
                       </div>
@@ -520,169 +673,219 @@ export default function InvestorStockDetail() {
                 </div>
 
                 <div className="rounded-xl border border-slate-700 bg-slate-800/40 p-6">
-                  <h3 className="mb-3 text-xl font-semibold text-white">
+                  <h3 className="mb-3 text-xl font-semibold text-white text-center">
                     Ringkasan Bisnis
                   </h3>
-                  <p className="leading-relaxed text-slate-300">
-                    {profile.longBusinessSummary || "-"}
+                  <p className="leading-relaxed text-slate-300 text-justify">
+                    {profile.longBusinessSummary ||
+                      "Ringkasan bisnis belum tersedia dalam Bahasa Indonesia."}
                   </p>
                 </div>
               </div>
             )}
 
             {activeTab === "fundamental" && (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <h3 className="text-xl font-semibold text-white">Fundamental</h3>
-
-                  <span
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 ${valuationClass}`}
-                  >
-                    <span className="text-sm">Interpretasi:</span>
-                    <span className="font-semibold">{valuation.label}</span>
-                  </span>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
-                  <div className="border-b border-slate-700/60 px-5 py-4">
-                    <p className="font-semibold text-white">Rasio Utama</p>
+              <div className="space-y-6 text-center">
+                {isFundamentalsLoading ? (
+                  <div className="py-12 text-center text-slate-400">
+                    Memuat data fundamental dari yfinance API...
                   </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[720px]">
-                      <thead>
-                        <tr className="border-b border-slate-700/60 bg-slate-900/30">
-                          <th className="px-5 py-3 text-left text-sm font-semibold text-slate-300">Metrik</th>
-                          <th className="px-5 py-3 text-left text-sm font-semibold text-slate-300">Nilai</th>
-                          <th className="px-5 py-3 text-left text-sm font-semibold text-slate-300">Benchmark</th>
-                          <th className="px-5 py-3 text-left text-sm font-semibold text-slate-300">Keterangan</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        <tr className="border-b border-slate-700/40">
-                          <td className="px-5 py-4 font-medium text-slate-200">EPS (TTM)</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {formatIDR(fundamental.epsTTM)}
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {formatIDR(benchmarks.eps)}
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {Number(fundamental.epsTTM || 0) >= Number(benchmarks.eps || 0)
-                              ? "Di atas benchmark"
-                              : "Di bawah benchmark"}
-                          </td>
-                        </tr>
-
-                        <tr className="border-b border-slate-700/40">
-                          <td className="px-5 py-4 font-medium text-slate-200">PER (TTM)</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {Number(fundamental.perTTM || 0).toFixed(2)}x
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {Number(benchmarks.per || 0).toFixed(2)}x
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {Number(fundamental.perTTM || 0) <= Number(benchmarks.per || 0)
-                              ? "Relatif lebih murah"
-                              : "Relatif lebih mahal"}
-                          </td>
-                        </tr>
-
-                        <tr className="border-b border-slate-700/40">
-                          <td className="px-5 py-4 font-medium text-slate-200">PBV</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {Number(fundamental.pbv || 0).toFixed(2)}x
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {Number(benchmarks.pbv || 0).toFixed(2)}x
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {Number(fundamental.pbv || 0) <= Number(benchmarks.pbv || 0)
-                              ? "Lebih rendah dari benchmark"
-                              : "Lebih tinggi dari benchmark"}
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td className="px-5 py-4 font-medium text-slate-200">ROE</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {formatPercent(fundamental.roe)}
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {formatPercent(benchmarks.roe)}
-                          </td>
-                          <td className="px-5 py-4 text-slate-300">
-                            {Number(fundamental.roe || 0) >= Number(benchmarks.roe || 0)
-                              ? "Profitabilitas bagus"
-                              : "Perlu perhatian"}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                ) : !fundamentalsData ? (
+                  <div className="py-12 text-center text-slate-400">
+                    <p>Data fundamental belum dimuat</p>
+                    <button
+                      onClick={handleFundamentalsLoad}
+                      className="mt-4 rounded-lg bg-cyan-600/30 px-6 py-2 text-cyan-200 transition hover:bg-cyan-600/40"
+                    >
+                      Muat Data Fundamental
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <h3 className="text-xl font-semibold text-white">
+                        Fundamental (dari yfinance API)
+                      </h3>
 
-                <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
-                  <div className="border-b border-slate-700/60 px-5 py-4">
-                    <p className="font-semibold text-white">Data Mentah (Ringkas)</p>
-                  </div>
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 ${valuationClass}`}
+                      >
+                        <span className="text-sm">Interpretasi:</span>
+                        <span className="font-semibold">{valuation.label}</span>
+                      </span>
+                    </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[520px]">
-                      <thead>
-                        <tr className="border-b border-slate-700/60 bg-slate-900/30">
-                          <th className="px-5 py-3 text-left text-sm font-semibold text-slate-300">Metrik</th>
-                          <th className="px-5 py-3 text-left text-sm font-semibold text-slate-300">Nilai</th>
-                        </tr>
-                      </thead>
+                    <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
+                      <div className="border-b border-slate-700/60 px-5 py-4 text-center">
+                        <p className="font-semibold text-white">
+                          Rasio Fundamental (dari yfinance)
+                        </p>
+                      </div>
 
-                      <tbody>
-                        <tr className="border-b border-slate-700/40">
-                          <td className="px-5 py-4 font-medium text-slate-200">Revenue (Pendapatan)</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {formatIDR(fundamental.revenue)}
-                          </td>
-                        </tr>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[720px] text-center">
+                          <thead>
+                            <tr className="border-b border-slate-700/60 bg-slate-900/30">
+                              <th className="px-5 py-3 text-center text-sm font-semibold text-slate-300">
+                                Metrik
+                              </th>
+                              <th className="px-5 py-3 text-center text-sm font-semibold text-slate-300">
+                                Nilai
+                              </th>
+                              <th className="px-5 py-3 text-center text-sm font-semibold text-slate-300">
+                                Interpretasi
+                              </th>
+                            </tr>
+                          </thead>
 
-                        <tr className="border-b border-slate-700/40">
-                          <td className="px-5 py-4 font-medium text-slate-200">Net Income (Laba Bersih)</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {formatIDR(fundamental.netIncome)}
-                          </td>
-                        </tr>
+                          <tbody>
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">EPS</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {fundamentalsRatios.eps ? formatIDR(fundamentalsRatios.eps) : "-"}
+                              </td>
+                              <td className="px-5 py-4 text-slate-300">
+                                Pendapatan per lembar saham
+                              </td>
+                            </tr>
 
-                        <tr className="border-b border-slate-700/40">
-                          <td className="px-5 py-4 font-medium text-slate-200">Total Assets</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {formatIDR(fundamental.totalAssets)}
-                          </td>
-                        </tr>
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">PER</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {fundamentalsRatios.pe
+                                  ? `${Number(fundamentalsRatios.pe).toFixed(2)}x`
+                                  : "-"}
+                              </td>
+                              <td className="px-5 py-4 text-slate-300">
+                                {fundamentalsRatios.pe && Number(fundamentalsRatios.pe) < 15
+                                  ? "Murah"
+                                  : fundamentalsRatios.pe && Number(fundamentalsRatios.pe) > 25
+                                  ? "Mahal"
+                                  : "Wajar"}
+                              </td>
+                            </tr>
 
-                        <tr>
-                          <td className="px-5 py-4 font-medium text-slate-200">Total Equity</td>
-                          <td className="px-5 py-4 font-semibold text-white">
-                            {formatIDR(fundamental.totalEquity)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">PBV</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {fundamentalsRatios.pbv
+                                  ? `${Number(fundamentalsRatios.pbv).toFixed(2)}x`
+                                  : "-"}
+                              </td>
+                              <td className="px-5 py-4 text-slate-300">
+                                {fundamentalsRatios.pbv && Number(fundamentalsRatios.pbv) < 1
+                                  ? "Undervalued"
+                                  : "Normal"}
+                              </td>
+                            </tr>
 
-                <div className="text-sm leading-relaxed text-slate-400">
+                            <tr>
+                              <td className="px-5 py-4 font-medium text-slate-200">ROE</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {fundamentalsRatios.roe
+                                  ? `${Number(fundamentalsRatios.roe).toFixed(2)}%`
+                                  : "-"}
+                              </td>
+                              <td className="px-5 py-4 text-slate-300">
+                                {fundamentalsRatios.roe && Number(fundamentalsRatios.roe) > 15
+                                  ? "Profitable"
+                                  : "Perlu dikaji"}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
+                      <div className="border-b border-slate-700/60 px-5 py-4 text-center">
+                        <p className="font-semibold text-white">Data Mentah dari yfinance</p>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[520px] text-center">
+                          <thead>
+                            <tr className="border-b border-slate-700/60 bg-slate-900/30">
+                              <th className="px-5 py-3 text-center text-sm font-semibold text-slate-300">
+                                Metrik
+                              </th>
+                              <th className="px-5 py-3 text-center text-sm font-semibold text-slate-300">
+                                Nilai
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">
+                                Harga Saat Ini
+                              </td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.currentPrice)}
+                              </td>
+                            </tr>
+
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">
+                                Book Value Per Share
+                              </td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.bookValuePerShare)}
+                              </td>
+                            </tr>
+
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">Revenue</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.revenue)}
+                              </td>
+                            </tr>
+
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">Net Income</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.netIncome)}
+                              </td>
+                            </tr>
+
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">
+                                Total Assets
+                              </td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.totalAssets)}
+                              </td>
+                            </tr>
+
+                            <tr className="border-b border-slate-700/40">
+                              <td className="px-5 py-4 font-medium text-slate-200">
+                                Total Equity
+                              </td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.totalEquity)}
+                              </td>
+                            </tr>
+
+                            <tr>
+                              <td className="px-5 py-4 font-medium text-slate-200">Market Cap</td>
+                              <td className="px-5 py-4 font-semibold text-white">
+                                {formatIDR(fundamentalsRawData.marketCap)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="text-center text-sm leading-relaxed text-slate-400">
                   <span className="font-semibold text-slate-300">Catatan interpretasi:</span>{" "}
-                  Label “murah/mahal” menggunakan aturan sederhana berbasis perbandingan benchmark dan bukan analisis profesional.
+                  Label murah/mahal ini masih aturan sederhana berbasis benchmark, jadi jangan
+                  dianggap analisis profesional full.
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {!activeTab && (
-          <div className="py-12 text-center text-slate-500">
-            Pilih salah satu tab di atas untuk melihat detail
           </div>
         )}
       </div>

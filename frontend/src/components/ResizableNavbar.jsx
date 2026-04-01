@@ -27,7 +27,7 @@ export default function ResizableNavbarWrapper({
   return (
     <Navbar className={className}>
       {/* DESKTOP */}
-      <NavBody className={cn("dark:bg-transparent pl-1 pr-270")}>
+      <NavBody className={cn("-1 pr-270")}>
         <Brand brand={brand} />
 
         <DesktopNavLinks items={items} />

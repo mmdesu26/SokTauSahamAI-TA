@@ -33,31 +33,41 @@ export default function ChangePassword() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const errors = [];
+  const errors = [];
 
-    if (!formData.oldPassword.trim()) {
-      errors.push("Password lama wajib diisi.");
+  if (!formData.oldPassword.trim()) {
+    errors.push("Password lama wajib diisi.");
+  }
+  if (!formData.newPassword.trim()) {
+    errors.push("Password baru wajib diisi.");
+  }
+  if (!formData.confirmPassword.trim()) {
+    errors.push("Konfirmasi password wajib diisi.");
+  }
+
+  // === VALIDASI BARU (8 karakter + complexity) ===
+  const pwd = formData.newPassword.trim();
+  if (pwd) {
+    if (pwd.length < 8) {
+      errors.push("Password baru minimal 8 karakter.");
     }
-
-    if (!formData.newPassword.trim()) {
-      errors.push("Password baru wajib diisi.");
+    if (!/[A-Z]/.test(pwd)) {
+      errors.push("Password baru harus mengandung minimal 1 huruf besar (A-Z).");
     }
-
-    if (!formData.confirmPassword.trim()) {
-      errors.push("Konfirmasi password wajib diisi.");
+    if (!/[a-z]/.test(pwd)) {
+      errors.push("Password baru harus mengandung minimal 1 huruf kecil (a-z).");
     }
-
-    if (formData.newPassword && formData.newPassword.length < 6) {
-      errors.push("Password baru minimal 6 karakter.");
+    if (!/\d/.test(pwd)) {
+      errors.push("Password baru harus mengandung minimal 1 angka (0-9).");
     }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(pwd)) {
+      errors.push("Password baru harus mengandung minimal 1 simbol (!@#$%^&* dll).");
+    }
+  }
 
-    if (
-      formData.newPassword.trim() &&
-      formData.confirmPassword.trim() &&
-      formData.newPassword !== formData.confirmPassword
-    ) {
+    if (pwd && formData.confirmPassword.trim() && pwd !== formData.confirmPassword.trim()) {
       errors.push("Password baru dan konfirmasi password tidak sama.");
     }
 

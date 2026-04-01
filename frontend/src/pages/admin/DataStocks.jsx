@@ -12,11 +12,6 @@ import { useAppAlert } from "@/components/AppAlertContext";
 
 const INITIAL_FORM = {
   ticker: "",
-  name: "",
-  sector: "",
-  price: "",
-  change: "",
-  volume: "",
   status: "Active",
 };
 
@@ -78,11 +73,6 @@ export default function AdminDataStocks() {
     if (type === "edit" && stock) {
       setFormData({
         ticker: stock.ticker ?? "",
-        name: stock.name ?? "",
-        sector: stock.sector ?? "",
-        price: stock.price ?? "",
-        change: stock.change ?? "",
-        volume: stock.volume ?? "",
         status: stock.status ?? "Active",
       });
       setSelectedStockId(stock.id);
@@ -130,13 +120,9 @@ export default function AdminDataStocks() {
   };
 
   const handleSave = async () => {
-    if (
-      !formData.ticker.trim() ||
-      !formData.name.trim() ||
-      !formData.sector.trim()
-    ) {
+    if (!formData.ticker.trim()) {
       showError(
-        "Ticker, nama perusahaan, dan sektor wajib diisi.",
+        "Format: BBCA atau BBCA.JK (Ticker saham)",
         "Gagal"
       );
       return;
@@ -144,11 +130,6 @@ export default function AdminDataStocks() {
 
     const payload = {
       ticker: formData.ticker.trim().toUpperCase(),
-      name: formData.name.trim(),
-      sector: formData.sector.trim(),
-      price: Number(formData.price || 0),
-      change: formData.change || "0.00%",
-      volume: String(formData.volume || "0"),
       status: formData.status || "Active",
     };
 
@@ -156,11 +137,13 @@ export default function AdminDataStocks() {
       let response;
 
       if (modalType === "edit" && selectedStockId) {
+        // Edit hanya bisa ubah status saja
         response = await apiFetch(`/admin/stocks/${selectedStockId}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
       } else {
+        // Create: Fetch nama, sektor, harga otomatis dari yfinance
         response = await apiFetch("/admin/stocks", {
           method: "POST",
           body: JSON.stringify(payload),
@@ -170,7 +153,10 @@ export default function AdminDataStocks() {
       const { ok, data } = response;
 
       if (ok && data?.success) {
-        showSuccess(data.message || "Data saham berhasil disimpan.", "Berhasil");
+        showSuccess(
+          data.message || "Data saham berhasil disimpan. Informasi lain diambil dari yfinance.",
+          "Berhasil"
+        );
         handleCloseModal();
         fetchStocks();
       } else {
@@ -350,89 +336,29 @@ export default function AdminDataStocks() {
             </div>
 
             <div className="space-y-5">
-              <input
-                type="text"
-                value={formData.ticker}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    ticker: e.target.value.toUpperCase(),
-                  }))
-                }
-                placeholder="Ticker"
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-              />
-
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    name: e.target.value,
-                  }))
-                }
-                placeholder="Nama Perusahaan"
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-              />
-
-              <select
-                value={formData.sector}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    sector: e.target.value,
-                  }))
-                }
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-              >
-                <option value="">Pilih Sektor</option>
-                <option value="Finance">Finance</option>
-                <option value="Automotive">Automotive</option>
-                <option value="Telecom">Telecom</option>
-                <option value="Mining">Mining</option>
-                <option value="Technology">Technology</option>
-                <option value="Consumer Goods">Consumer Goods</option>
-              </select>
-
-              <input
-                type="number"
-                value={formData.price}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    price: e.target.value,
-                  }))
-                }
-                placeholder="Harga"
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-              />
-
-              <input
-                type="text"
-                value={formData.change}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    change: e.target.value,
-                  }))
-                }
-                placeholder="Perubahan, contoh: +2.34%"
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-              />
-
-              <input
-                type="text"
-                value={formData.volume}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    volume: e.target.value,
-                  }))
-                }
-                placeholder="Volume, contoh: 125.3M"
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#222222]">
+                  Ticker (format: BBCA atau BBCA.JK)
+                </label>
+                <input
+                  type="text"
+                  value={formData.ticker}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      ticker: e.target.value.toUpperCase(),
+                    }))
+                  }
+                  placeholder="Contoh: BBCA"
+                  disabled={modalType === "edit"}
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20 disabled:bg-[var(--color-admin3)]/30 disabled:cursor-not-allowed"
+                />
+                <p className="mt-1 text-xs text-[#666666]">
+                  {modalType === "add"
+                    ? "Data nama, sektor, dan harga akan diambil otomatis dari yfinance"
+                    : "Ticker tidak bisa diubah. Edit hanya untuk mengubah status."}
+                </p>
+              </div>
 
               <select
                 value={formData.status}

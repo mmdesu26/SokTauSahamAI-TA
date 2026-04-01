@@ -1,21 +1,32 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
 import ResizableNavbarWrapper from "@/components/ResizableNavbar";
 import BoxesWrapper from "@/components/BoxesBg";
 import { AppAlertProvider } from "@/components/AppAlertContext";
+import { clearAdminSession } from "@/utils/authSession";
+import useAdminAutoLogout from "@/hooks/useAdminAutoLogout";
+import { apiFetch } from "@/lib/api";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  useAdminAutoLogout();
+
+  useEffect(() => {
+    document.title = "SokTauSaham Admin";
+  }, []);
+
   const handleLogoutClick = () => setShowLogoutModal(true);
 
-  const handleConfirmLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  const handleConfirmLogout = async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch {}
+    clearAdminSession();
     setShowLogoutModal(false);
-    navigate("/admin/login");
+    navigate("/admin/login", { replace: true });
   };
 
   const navItems = [
@@ -30,12 +41,7 @@ export default function AdminLayout() {
     <AppAlertProvider>
       <BoxesWrapper className="min-h-screen w-full bg-[var(--color-admin3)]">
         <div className="fixed top-0 left-0 z-50 w-full">
-          <ResizableNavbarWrapper
-            brand="SokTauSahamAdmin"
-            items={navItems}
-            onLogout={handleLogoutClick}
-            className="dark"
-          />
+          <ResizableNavbarWrapper brand="SokTauSaham Admin" items={navItems} onLogout={handleLogoutClick} className="dark" />
         </div>
 
         {showLogoutModal && (
@@ -45,31 +51,12 @@ export default function AdminLayout() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100">
                   <AlertCircle className="h-7 w-7 text-red-500" />
                 </div>
-
-                <h3 className="text-xl font-semibold text-[#222222]">
-                  Yakin ingin keluar?
-                </h3>
+                <h3 className="text-xl font-semibold text-[#222222]">Yakin ingin keluar?</h3>
               </div>
-
-              <p className="mb-8 leading-relaxed text-[#555555]">
-                Anda akan keluar dari akun admin dan harus login kembali untuk
-                mengakses panel.
-              </p>
-
+              <p className="mb-8 leading-relaxed text-[#555555]">Anda akan keluar dari akun admin dan harus login kembali untuk mengakses panel.</p>
               <div className="flex gap-4">
-                <button
-                  onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white px-5 py-3 font-medium text-[#222222] transition hover:bg-[var(--color-admin3)]"
-                >
-                  Batal
-                </button>
-
-                <button
-                  onClick={handleConfirmLogout}
-                  className="flex-1 rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white transition hover:bg-[var(--color-admin2)] hover:text-[#222222]"
-                >
-                  Ya, Logout
-                </button>
+                <button onClick={() => setShowLogoutModal(false)} className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white px-5 py-3 font-medium text-[#222222] transition hover:bg-[var(--color-admin3)]">Batal</button>
+                <button onClick={handleConfirmLogout} className="flex-1 rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white transition hover:bg-[var(--color-admin2)] hover:text-[#222222]">Ya, Logout</button>
               </div>
             </div>
           </div>

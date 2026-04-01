@@ -1,57 +1,58 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Download, Search } from "lucide-react";
-
-const mockLogs = [
-  {
-    id: 1,
-    timestamp: "2024-01-12 14:30:15",
-    level: "error",
-    source: "yFinance API",
-    message: "Timeout saat mengambil data BBCA",
-    details: "Error code: 504 Gateway Timeout",
-  },
-  {
-    id: 2,
-    timestamp: "2024-01-12 14:25:48",
-    level: "info",
-    source: "ML Training",
-    message: "Model training dimulai untuk dataset baru",
-    details: "Using 5000 training samples",
-  },
-  {
-    id: 3,
-    timestamp: "2024-01-12 14:20:10",
-    level: "warning",
-    source: "Database",
-    message: "Query execution time tinggi",
-    details: "Execution time: 3.2s (threshold: 2s)",
-  },
-  {
-    id: 4,
-    timestamp: "2024-01-12 14:15:33",
-    level: "success",
-    source: "Data Sync",
-    message: "Sinkronisasi 1,245 records dari yFinance",
-    details: "Updated at: 2024-01-12 14:15:33",
-  },
-];
+import { apiFetch } from "@/lib/api";
+import { useAppAlert } from "@/components/AppAlertContext";
 
 export default function AdminLogs() {
+  const { showError } = useAppAlert();
+  const [logs, setLogs] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLevel, setFilterLevel] = useState("all");
   const [expandedLog, setExpandedLog] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
 
-  const filteredLogs = mockLogs.filter((log) => {
-    const query = searchQuery.toLowerCase().trim();
+  const LIMIT = 50;
 
-    const matchesSearch =
-      log.message.toLowerCase().includes(query) ||
-      log.source.toLowerCase().includes(query);
+  const fetchLogs = async (offsetVal = 0) => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        limit: LIMIT,
+        offset: offsetVal,
+        ...(filterLevel !== "all" && { level: filterLevel }),
+        ...(searchQuery && { source: searchQuery }),
+      });
 
-    const matchesLevel = filterLevel === "all" || log.level === filterLevel;
+      const { ok, data } = await apiFetch(`/admin/logs?${params}`);
 
-    return matchesSearch && matchesLevel;
-  });
+      if (ok && data?.success) {
+        setLogs(data.data || []);
+        setTotal(data.total || 0);
+        setOffset(offsetVal);
+      } else {
+        showError(data?.message || "Gagal mengambil log.", "Gagal");
+      }
+    } catch (error) {
+      showError("Terjadi kesalahan saat mengambil log.", "Gagal");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs(0);
+  }, [filterLevel]);
+
+  const handleSearch = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    fetchLogs(0);
+  };
+
+  const filteredLogs = logs;
 
   const getLevelColors = (level) => {
     const colors = {
@@ -80,6 +81,33 @@ export default function AdminLogs() {
     return colors[level] || "border-[var(--color-admin)]";
   };
 
+  function formatLogTimestamp(value) {
+  if (!value) return "-";
+
+  const raw = String(value).trim();
+
+  // backend kirim naive datetime: "2026-04-01 00:18:37"
+  // dipaksa anggap itu UTC
+  const normalized = raw.includes("T")
+    ? raw.replace(" ", "")
+    : raw.replace(" ", "T");
+
+  const utcValue = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
+  const date = new Date(utcValue);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return `${new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Asia/Jakarta",
+  }).format(date)} WIB`;
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 pb-16">
       {/* Header */}
@@ -99,15 +127,26 @@ export default function AdminLogs() {
           <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-[#666666]" />
           <input
             type="text"
-            placeholder="Cari log atau sumber..."
+            placeholder="Cari sumber aktivitas (CRUD Stock, Prediction, Auth, dll)..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearch}
             className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-4 pl-12 text-[#222222] placeholder-[#666666] shadow-sm transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
           />
         </div>
 
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 font-medium text-[#222222] shadow-sm transition hover:bg-[var(--color-admin3)]">
+          <button
+            onClick={() => {
+              const csv = logs.map(log => `"${log.timestamp}","${log.level}","${log.source}","${log.message}","${log.username}"`).join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "logs.csv";
+              a.click();
+            }}
+            className="flex items-center gap-2 rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 font-medium text-[#222222] shadow-sm transition hover:bg-[var(--color-admin3)]"
+          >
             <Download className="h-4 w-4 text-[var(--color-admin)]" />
             Export
           </button>
@@ -135,7 +174,11 @@ export default function AdminLogs() {
 
       {/* Logs */}
       <section className="overflow-hidden rounded-3xl border border-[var(--color-admin4)] bg-white shadow-sm">
-        {filteredLogs.length > 0 ? (
+        {isLoading ? (
+          <div className="py-12 text-center">
+            <p className="text-lg text-[#666666]">Memuat log...</p>
+          </div>
+        ) : filteredLogs.length > 0 ? (
           <div className="divide-y divide-[var(--color-admin4)]/70">
             {filteredLogs.map((log) => (
               <div key={log.id} className={`border-l-4 ${getBorderColor(log.level)}`}>
@@ -160,12 +203,14 @@ export default function AdminLogs() {
                         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#666666]">
                           <span>{log.source}</span>
                           <span>•</span>
-                          <span>{log.timestamp}</span>
+                          <span>{log.username || "system"}</span>
+                          <span>•</span>
+                          <span>{formatLogTimestamp(log.timestamp)}</span>
                         </div>
 
                         {expandedLog === log.id && log.details && (
                           <div className="mt-4 rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)]/70 p-4">
-                            <p className="font-mono text-xs text-[#555555]">
+                            <p className="font-mono text-xs whitespace-pre-wrap text-[#555555]">
                               {log.details}
                             </p>
                           </div>
@@ -185,6 +230,31 @@ export default function AdminLogs() {
           </div>
         )}
       </section>
+
+      {/* Pagination */}
+      {total > LIMIT && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[#666666]">
+            Menampilkan {offset + 1} - {Math.min(offset + LIMIT, total)} dari {total} log
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fetchLogs(Math.max(0, offset - LIMIT))}
+              disabled={offset === 0}
+              className="rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-2 text-sm font-medium text-[#222222] transition hover:bg-[var(--color-admin3)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sebelumnya
+            </button>
+            <button
+              onClick={() => fetchLogs(offset + LIMIT)}
+              disabled={offset + LIMIT >= total}
+              className="rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-2 text-sm font-medium text-[#222222] transition hover:bg-[var(--color-admin3)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

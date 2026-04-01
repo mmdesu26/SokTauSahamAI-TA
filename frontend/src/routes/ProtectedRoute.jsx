@@ -1,11 +1,12 @@
 import { Navigate, Outlet } from "react-router-dom";
+import { isAdminSessionActive, getUser } from "@/utils/authSession";
 
 export default function ProtectedRoute({ allowedRoles = [], children }) {
-  const token = localStorage.getItem("token");
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-
   if (allowedRoles.includes("admin")) {
-    if (!token || !user || user.role !== "admin") {
+    const isActive = isAdminSessionActive();
+    const user = getUser();
+
+    if (!isActive || !user || user.role !== "admin") {
       return <Navigate to="/admin/login" replace />;
     }
   }

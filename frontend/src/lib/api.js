@@ -1,12 +1,10 @@
-const isDev = import.meta.env.DEV;
+import { clearAdminSession, getToken } from "@/utils/authSession";
 
-const BASE_URL = isDev
-  ? "/api"
-  : "https://api.soktausaham.com/api";
+const isDev = import.meta.env.DEV;
+const BASE_URL = isDev ? "/api" : "https://api.soktausaham.com/api";
 
 export async function apiFetch(endpoint, options = {}) {
-  const token = localStorage.getItem("token");
-
+  const token = getToken();
   const url = `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
 
   const response = await fetch(url, {
@@ -26,8 +24,7 @@ export async function apiFetch(endpoint, options = {}) {
   }
 
   if (response.status === 401) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearAdminSession();
   }
 
   return { ok: response.ok, data, status: response.status };

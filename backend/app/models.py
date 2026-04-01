@@ -206,7 +206,7 @@ class StockPriceHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     stock_id = db.Column(db.Integer, db.ForeignKey("stocks.id"), nullable=False)
 
-    timeframe = db.Column(db.String(10), nullable=False)  # 1D, 1W, 1M, 3M, 1Y
+    timeframe = db.Column(db.String(10), nullable=False)  # 1D, 1W, 1M, 3M, 1Y, 1h
     label = db.Column(db.String(50), nullable=False)      # 09:00, H1, 2026-03-01, dll
     open_price = db.Column(db.Float, nullable=False)
     high_price = db.Column(db.Float, nullable=False)
@@ -234,3 +234,39 @@ class StockPriceHistory(db.Model):
             "close": self.close_price,
             "sortOrder": self.sort_order,
         }
+
+
+class SystemLog(db.Model):
+    __tablename__ = "system_logs"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    timestamp = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
+    level = db.Column(db.String(20), nullable=False)  # 'success', 'warning', 'error', 'info'
+    source = db.Column(db.String(100), nullable=False)  # 'Stock Management', 'ML Prediction', 'Authentication', etc
+    message = db.Column(db.String(255), nullable=False)
+    details = db.Column(db.Text, nullable=True)  # Error details, stack trace, JSON data, etc
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    action_type = db.Column(db.String(50), nullable=True)  # 'CREATE', 'UPDATE', 'DELETE', 'PREDICT', 'LOGIN', 'PASSWORD_CHANGE'
+    entity_type = db.Column(db.String(50), nullable=True)  # 'Stock', 'Glossary', 'User', 'Prediction'
+    entity_id = db.Column(db.Integer, nullable=True)  # ID of the entity affected
+    ip_address = db.Column(db.String(50), nullable=True)
+
+    user = db.relationship("User", backref=db.backref("logs", lazy=True))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S") if self.timestamp else None,
+            "level": self.level,
+            "source": self.source,
+            "message": self.message,
+            "details": self.details,
+            "user_id": self.user_id,
+            "action_type": self.action_type,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "username": self.user.username if self.user else "system",
+        }
+
+    def __repr__(self):
+        return f"<SystemLog {self.level} - {self.source}>"
