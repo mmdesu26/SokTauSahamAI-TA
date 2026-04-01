@@ -315,19 +315,6 @@ export default function InvestorStockDetail() {
               </p>
             </div>
           </div>
-
-          <div className="min-w-[220px] text-right">
-            <p className="text-xs text-slate-300/80">Source: {chartMeta.source || "yfinance"}</p>
-            <p className="text-xs text-slate-300/80">
-              Tanggal data terbaru: {formatLocalDate(chartMeta.latestDate)}
-            </p>
-            <p className="text-xs text-slate-300/80">
-              Update terakhir: {formatChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
-            </p>
-            <p className="mt-1 text-xs text-amber-200/90">
-              {chartMeta.note || "Data ini bukan harga realtime dan hanya visualisasi historis dari yfinance, tidak terkait harga prediksi."}
-            </p>
-          </div>
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-4 text-center md:grid-cols-5">
@@ -704,7 +691,7 @@ export default function InvestorStockDetail() {
                   <>
                     <div className="flex flex-col items-center justify-center gap-3">
                       <h3 className="text-xl font-semibold text-white">
-                        Fundamental (dari yfinance API)
+                        Fundamental
                       </h3>
 
                       <span
@@ -718,7 +705,7 @@ export default function InvestorStockDetail() {
                     <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
                       <div className="border-b border-slate-700/60 px-5 py-4 text-center">
                         <p className="font-semibold text-white">
-                          Rasio Fundamental (dari yfinance)
+                          Rasio Fundamental
                         </p>
                       </div>
 
@@ -799,7 +786,7 @@ export default function InvestorStockDetail() {
 
                     <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
                       <div className="border-b border-slate-700/60 px-5 py-4 text-center">
-                        <p className="font-semibold text-white">Data Mentah dari yfinance</p>
+                        <p className="font-semibold text-white">Data Mentah</p>
                       </div>
 
                       <div className="overflow-x-auto">
@@ -881,9 +868,9 @@ export default function InvestorStockDetail() {
 
                 <div className="text-center text-sm leading-relaxed text-slate-400">
                   <span className="font-semibold text-slate-300">Catatan interpretasi:</span>{" "}
-                  Label murah/mahal ini masih aturan sederhana berbasis benchmark, jadi jangan
-                  dianggap analisis profesional full.
-                </div>
+                  Penilaian ini menggunakan standar umum rasio saham, seperti PER kurang dari 15 dianggap murah, PBV kurang dari 1 undervalued, 
+                  ROE kurang dari 15% dianggap baik, dan EPS positif menunjukkan perusahaan menghasilkan laba. Hasil ini hanya sebagai gambaran awal dan bukan analisis profesional.
+                  </div>
               </div>
             )}
           </div>

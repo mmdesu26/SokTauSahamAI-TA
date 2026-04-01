@@ -1,161 +1,214 @@
-import logging  # buat logging (debug/error)
-import numpy as np  # buat hitung numerik
-import pandas as pd  # buat olah data tabel
-from sklearn.ensemble import RandomForestRegressor  # model random forest
-from sklearn.linear_model import LinearRegression  # model linear regression
-from sklearn.metrics import mean_squared_error  # buat hitung error
-from sklearn.preprocessing import StandardScaler  # buat normalisasi data
-from app.utils.yfinance_helper import YFinanceHelper  # ambil data saham dari yfinance
+import logging
+import numpy as np
+import pandas as pd
 
-logger = logging.getLogger(__name__)  # logger buat nampilin error
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
+from sklearn.preprocessing import StandardScaler
+
+from app.utils.yfinance_helper import YFinanceHelper
+
+logger = logging.getLogger(__name__)
 
 
 class StockPricePredictor:
-    """predict harga saham pake RF + LR + fundamental"""
+    """
+    Prediksi harga closing saham 1 bulan ke depan
+    menggunakan Random Forest + Linear Regression
+    dengan fitur fundamental saja: EPS, ROE, PBV, PER.
+    """
 
-    def __init__(self, ticker, days=252):
-        self.ticker = ticker  # kode saham
-        self.days = days  # jumlah hari data
-        self.rf_model = RandomForestRegressor(n_estimators=200, random_state=42, min_samples_leaf=2)  # model RF
-        self.lr_model = LinearRegression()  # model LR
-        self.scaler = StandardScaler()  # buat scaling data
+    def __init__(self, ticker, days=720, forecast_horizon=20):
+        self.ticker = ticker
+        self.days = days
+        self.forecast_horizon = forecast_horizon
 
-        # fitur yg dipakai buat training
-        self.feature_columns = [
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "lag_close_1",
-            "lag_close_3",
-            "return_1d",
-            "eps",
-            "per",
-            "pbv",
-            "roe",
-        ]
-        self.dataset = None  # tempat nyimpen dataset
+        self.rf_model = RandomForestRegressor(
+            n_estimators=300,
+            max_depth=8,
+            min_samples_leaf=3,
+            random_state=42,
+            n_jobs=-1
+        )
+        self.lr_model = LinearRegression()
+        self.scaler = StandardScaler()
+
+        # sesuai permintaan: hanya fundamental
+        self.feature_columns = ["eps", "roe", "pbv", "per"]
+
+        self.dataset = None
+        self.metrics = None
+
+    @staticmethod
+    def _safe_float(value, default=0.0):
+        try:
+            if value is None or pd.isna(value):
+                return default
+            return float(value)
+        except Exception:
+            return default
 
     def prepare_dataset(self):
-        # ambil data harga saham
-        hist_df = YFinanceHelper.get_historical_prices(self.ticker, days=self.days, exclude_today=True)
-        if hist_df is None or hist_df.empty:
-            return None  # kalau kosong
+        hist_df = YFinanceHelper.get_historical_prices(
+            self.ticker,
+            days=self.days,
+            exclude_today=True
+        )
 
-        # ambil data fundamental
-        fundamentals = YFinanceHelper.get_fundamentals(self.ticker)
-        if not fundamentals:
+        if hist_df is None or hist_df.empty:
+            logger.error("Data historis kosong untuk %s", self.ticker)
             return None
 
-        # ambil kolom penting
-        df = hist_df[["Open", "High", "Low", "Close", "Volume"]].copy()
-        df.columns = ["open", "high", "low", "close", "volume"]  # rename biar simpel
+        fundamentals = YFinanceHelper.get_fundamentals(self.ticker) or {}
 
-        # bikin fitur tambahan
-        df["lag_close_1"] = df["close"].shift(1)  # harga kemarin
-        df["lag_close_3"] = df["close"].shift(3)  # harga 3 hari lalu
-        df["return_1d"] = df["close"].pct_change()  # perubahan harian
+        if "Close" not in hist_df.columns:
+            logger.error("Kolom Close tidak ditemukan untuk %s", self.ticker)
+            return None
 
-        # masukin data fundamental (fix per row)
-        df["eps"] = float(fundamentals.get("eps") or 0)
-        df["per"] = float(fundamentals.get("pe") or 0)
-        df["pbv"] = float(fundamentals.get("pbv") or 0)
-        df["roe"] = float(fundamentals.get("roe") or 0)
+        df = hist_df[["Close"]].copy()
+        df.columns = ["close"]
 
-        # target yg mau diprediksi (harga besok)
-        df["target_close_next"] = df["close"].shift(-1)
+        # fitur fundamental saja
+        eps = self._safe_float(fundamentals.get("eps"))
+        roe = self._safe_float(fundamentals.get("roe"))
+        pbv = self._safe_float(fundamentals.get("pbv"))
+        per = self._safe_float(fundamentals.get("pe"))
 
-        # bersihin data (hapus nan & inf)
+        df["eps"] = eps
+        df["roe"] = roe
+        df["pbv"] = pbv
+        df["per"] = per
+
+        # target = closing 1 bulan ke depan (~20 hari bursa)
+        df["target_close_1m"] = df["close"].shift(-self.forecast_horizon)
+
         df = df.replace([np.inf, -np.inf], np.nan).dropna().copy()
+
+        if len(df) < 60:
+            logger.error("Dataset terlalu sedikit setelah preprocessing untuk %s", self.ticker)
+            return None
+
         return df
 
-    def train(self):
-        df = self.prepare_dataset()  # siapin data
+    def _time_series_split(self, df, train_ratio=0.8):
+        split_idx = int(len(df) * train_ratio)
 
-        # cek data cukup atau gak
-        if df is None or df.empty or len(df) < 30:
-            logger.error(f"Dataset tidak cukup untuk melatih model {self.ticker}")
+        train_df = df.iloc[:split_idx].copy()
+        test_df = df.iloc[split_idx:].copy()
+
+        if len(train_df) < 30 or len(test_df) < 10:
+            return None, None
+
+        return train_df, test_df
+
+    def train(self):
+        df = self.prepare_dataset()
+        if df is None or df.empty:
             return False
 
-        X = df[self.feature_columns].values  # fitur
-        y = df["target_close_next"].values  # target
+        train_df, test_df = self._time_series_split(df)
+        if train_df is None or test_df is None:
+            logger.error("Gagal split dataset time-series untuk %s", self.ticker)
+            return False
 
-        # scaling data
-        X_scaled = self.scaler.fit_transform(X)
+        X_train = train_df[self.feature_columns].values
+        y_train = train_df["target_close_1m"].values
 
-        # training model
-        self.rf_model.fit(X_scaled, y)
-        self.lr_model.fit(X_scaled, y)
+        X_test = test_df[self.feature_columns].values
+        y_test = test_df["target_close_1m"].values
 
-        self.dataset = df  # simpen dataset
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_test_scaled = self.scaler.transform(X_test)
+
+        self.rf_model.fit(X_train_scaled, y_train)
+        self.lr_model.fit(X_train_scaled, y_train)
+
+        rf_pred = self.rf_model.predict(X_test_scaled)
+        lr_pred = self.lr_model.predict(X_test_scaled)
+
+        # sesuai alur sistem: RF 60%, LR 40%
+        ensemble_pred = (rf_pred * 0.6) + (lr_pred * 0.4)
+
+        mse = float(mean_squared_error(y_test, ensemble_pred))
+        rmse = float(np.sqrt(mse))
+        mae = float(mean_absolute_error(y_test, ensemble_pred))
+        mape = float(mean_absolute_percentage_error(y_test, ensemble_pred) * 100)
+
+        self.dataset = df
+        self.metrics = {
+            "mse": mse,
+            "rmse": rmse,
+            "mae": mae,
+            "mape": mape,
+            "train_size": int(len(train_df)),
+            "test_size": int(len(test_df)),
+        }
+
         return True
 
     def predict_next_month(self):
-        # kalau belum training
         if self.dataset is None and not self.train():
             return None
 
-        df = self.dataset.copy()
-        latest = df.iloc[-1]  # ambil data terakhir
-
-        # ambil fitur terbaru
+        latest = self.dataset.iloc[-1]
         X_latest = latest[self.feature_columns].to_frame().T.values
         X_latest_scaled = self.scaler.transform(X_latest)
 
-        # prediksi masing2 model
         rf_pred = float(self.rf_model.predict(X_latest_scaled)[0])
         lr_pred = float(self.lr_model.predict(X_latest_scaled)[0])
 
-        # gabung hasil (ensemble)
         predicted_close = (rf_pred * 0.6) + (lr_pred * 0.4)
 
-        # evaluasi model
-        X_train_scaled = self.scaler.transform(df[self.feature_columns].values)
-        y_true = df["target_close_next"].values
+        current_price = float(latest["close"])
+        expected_change_pct = (
+            ((predicted_close - current_price) / current_price) * 100
+            if current_price else 0
+        )
 
-        y_rf = self.rf_model.predict(X_train_scaled)
-        y_lr = self.lr_model.predict(X_train_scaled)
-        y_ensemble = (y_rf * 0.6) + (y_lr * 0.4)
-
-        mse = mean_squared_error(y_true, y_ensemble)  # error rata2
-        rmse = float(np.sqrt(mse))  # akar error
-
-        current_price = float(latest["close"])  # harga sekarang
-
-        # persen perubahan
-        expected_change_pct = ((predicted_close - current_price) / current_price) * 100 if current_price else 0
+        recommendation = "HOLD"
+        if expected_change_pct >= 3:
+            recommendation = "BUY"
+        elif expected_change_pct <= -3:
+            recommendation = "SELL"
 
         return {
             "ticker": self.ticker,
-            "predicted_close_1m": float(round(predicted_close, 2)),  # hasil prediksi
-            "rf_prediction": float(round(rf_pred, 2)),  # hasil RF
-            "lr_prediction": float(round(lr_pred, 2)),  # hasil LR
-            "rmse": float(round(rmse, 2)),  # error
-            "mse": float(round(mse, 2)),
-            "prediction_date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),  # waktu prediksi
+            "prediction_horizon_days": self.forecast_horizon,
+            "predicted_close_1m": float(round(predicted_close, 2)),
+            "rf_prediction": float(round(rf_pred, 2)),
+            "lr_prediction": float(round(lr_pred, 2)),
+            "ensemble_weights": {
+                "rf": 0.6,
+                "lr": 0.4,
+            },
             "current_price": float(round(current_price, 2)),
-            "expected_change_pct": float(round(expected_change_pct, 2)),  # naik/turun %
-
-            # info tambahan
+            "expected_change_pct": float(round(expected_change_pct, 2)),
+            "recommendation": recommendation,
+            "mse": float(round(self.metrics["mse"], 4)),
+            "rmse": float(round(self.metrics["rmse"], 4)),
+            "mae": float(round(self.metrics["mae"], 4)),
+            "mape": float(round(self.metrics["mape"], 4)),
+            "prediction_date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
             "features_used": {
                 "model": ["Random Forest", "Linear Regression"],
-                "fundamentals": ["PER", "EPS", "PBV", "ROE"],
-                "price_inputs": ["Open", "High", "Low", "Close", "Volume", "Lag Close"],
+                "fundamentals": ["EPS", "ROE", "PBV", "PER"],
             },
+            "validation": {
+                "train_size": self.metrics["train_size"],
+                "test_size": self.metrics["test_size"],
+                "evaluation_method": "time-series holdout split",
+                "target": "closing price 1 month ahead",
+            }
         }
 
 
-# fungsi simple buat langsung prediksi
 def predict_stock_price(ticker):
     try:
-        predictor = StockPricePredictor(ticker)  # bikin object
-
-        if not predictor.train():  # kalau gagal training
+        predictor = StockPricePredictor(ticker=ticker)
+        if not predictor.train():
             return None
-
-        return predictor.predict_next_month()  # hasil prediksi
-
+        return predictor.predict_next_month()
     except Exception as e:
-        logger.error(f"Error in predict_stock_price for {ticker}: {str(e)}")  # log error
-        return None  # kalau ada error, balikin None
+        logger.error("Error in predict_stock_price for %s: %s", ticker, str(e))
+        return None
