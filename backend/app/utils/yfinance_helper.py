@@ -71,7 +71,6 @@ class YFinanceHelper:
                 "changePercent": change_pct,  # persentase naik/turun
                 "date": latest_dt.strftime("%Y-%m-%d"),  # tanggal data
                 "updatedAt": YFinanceHelper._format_dt(latest_dt),  # tanggal + jam update
-                "volume": int(latest.get("Volume", 0) or 0),  # volume transaksi
                 "source": "yfinance",  # sumber data
                 "symbol": symbol,  # simbol saham final
             }
@@ -185,7 +184,6 @@ class YFinanceHelper:
                     "high": float(row["High"]),  # harga tertinggi
                     "low": float(row["Low"]),  # harga terendah
                     "close": float(row["Close"]),  # harga tutup
-                    "volume": int(row["Volume"]),  # volume
                     "timestamp": int(date.timestamp()),  # timestamp unix
                 })
 
@@ -256,7 +254,6 @@ class YFinanceHelper:
                     "high": float(row["High"]),
                     "low": float(row["Low"]),
                     "close": float(row["Close"]),
-                    "volume": int(row["Volume"] or 0),
                 })
 
             return {
@@ -303,7 +300,6 @@ class YFinanceHelper:
                     "high": float(row["High"]),
                     "low": float(row["Low"]),
                     "close": float(row["Close"]),
-                    "volume": int(row["Volume"] or 0),
                 })
 
             last_dt = YFinanceHelper._to_jakarta_naive(hist.index[-1]) if len(hist.index) else None

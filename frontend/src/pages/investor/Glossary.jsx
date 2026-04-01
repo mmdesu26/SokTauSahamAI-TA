@@ -35,9 +35,6 @@ export default function InvestorGlossary() {
     <div className="mx-auto w-full max-w-6xl space-y-10 pb-16">
       <div className="rounded-3xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/30 p-8 backdrop-blur-md md:p-12">
         <div className="mb-4 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-600/20">
-            <BookOpen className="h-7 w-7 text-cyan-400" />
-          </div>
           <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
             Glosarium Saham
           </h1>
@@ -56,8 +53,7 @@ export default function InvestorGlossary() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Cari istilah, singkatan, atau definisi..."
-          className="w-full rounded-xl border border-slate-700 bg-slate-900/70 py-4 pr-6 pl-14 text-white placeholder-slate-500 backdrop-blur-sm transition-all duration-200 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 focus:outline-none"
-        />
+          className="w-full rounded-lg border border-slate-800 bg-slate-900/50 py-3 pl-15 pr-4 text-white placeholder-slate-500 transition focus:border-[#4988C4]/60 focus:outline-none"        />
       </div>
 
       {isLoading ? (

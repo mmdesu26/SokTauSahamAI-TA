@@ -184,47 +184,62 @@ export default function InvestorDashboard() {
     <div className="w-full space-y-12">
       <section className="rounded-3xl border border-[#4988C4]/25 bg-gradient-to-r from-[#0F2854]/55 via-[#1C4D8D]/35 to-[#4988C4]/25 p-8 backdrop-blur-md md:p-12">
         <h1 className="mb-4 text-4xl font-bold tracking-tight text-white md:text-5xl">
-          Selamat Datang!
+          Selamat Datang Investor!
         </h1>
-        <p className="max-w-3xl text-lg text-slate-300 md:text-xl">
-          Analisis saham • Prediksi harga closing • Rekomendasi Buy/Sell
-        </p>
+        <ul className="max-w-3xl list-disc space-y-2 pl-5 text-lg text-slate-300 md:text-xl">
+        <li>
+          Analisis saham hanya sebagai referensi, bukan rekomendasi beli/jual.
+        </li>
+        <li>
+          Lakukan riset tambahan sebelum membuat keputusan investasi.
+        </li>
+        <li>
+          SokTauSaham tidak bertanggung jawab atas keuntungan atau kerugian
+          yang timbul dari penggunaan platform ini.
+        </li>
+      </ul>
       </section>
 
-      <section>
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-white md:text-3xl">
-            Ringkasan Pasar Hari Ini
-          </h2>
-          <p className="mt-2 text-slate-400">
-            Indikator utama yang dapat memengaruhi pergerakan saham Indonesia.
-            Tanggal dan jam update mengikuti data terbaru yang tersedia dari yfinance
+      <section className="space-y-6">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-2xl font-bold tracking-tight text-white md:text-3xl">
+          Ringkasan Pasar Hari Ini
+        </h2>
+        <p className="max-w-2xl text-sm leading-relaxed text-slate-400 md:text-base">
+          Indikator yang dapat memengaruhi pergerakan saham Indonesia
+        </p>
+      </div>
+
+      {isLoadingMarket ? (
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-10 text-center text-slate-400 shadow-sm backdrop-blur-md">
+          <p className="text-base font-medium">Memuat ringkasan pasar...</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Mengambil data terbaru dari yfinance.
           </p>
         </div>
-
-        {isLoadingMarket ? (
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-10 text-center text-slate-400 backdrop-blur-md">
-            Memuat ringkasan pasar dari yfinance...
+      ) : marketCards.length > 0 ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {marketCards.map((card) => (
+              <MarketCard key={card.key} {...card} />
+            ))}
           </div>
-        ) : marketCards.length > 0 ? (
-          <>
-            {/* grid 2 kolom biar card ihsg dan emas sama besar */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {marketCards.map((card) => (
-                <MarketCard key={card.key} {...card} />
-              ))}
+
+          {market?.note ? (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-200/90">
+              {market.note}
             </div>
-
-            {market?.note ? (
-              <p className="mt-4 text-sm text-amber-200/90">{market.note}</p>
-            ) : null}
-          </>
-        ) : (
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-10 text-center text-slate-400 backdrop-blur-md">
-            Ringkasan pasar gagal dimuat.
-          </div>
-        )}
-      </section>
+          ) : null}
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-10 text-center text-slate-400 shadow-sm backdrop-blur-md">
+          <p className="text-base font-medium">Ringkasan pasar gagal dimuat.</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Coba muat ulang beberapa saat lagi.
+          </p>
+        </div>
+      )}
+    </section>
 
       <section>
         <div className="mb-6 flex items-center justify-between">
@@ -305,11 +320,15 @@ export default function InvestorDashboard() {
           </li>
           <li className="flex items-start gap-3">
             <span className="mt-0.5 text-xl text-[#BDE8F5]">•</span>
-            Perhatikan rilis berita fundamental sebelum entry
+            Perhatikan rilis berita saham dan berita ekonomi sebelum entry
           </li>
           <li className="flex items-start gap-3">
             <span className="mt-0.5 text-xl text-[#BDE8F5]">•</span>
-            Jangan lupa untuk melihat update berita
+            Jika bisa menggunakan teknikal, perhatikan support/resistance dan volume untuk timing entry/exit
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 text-xl text-[#BDE8F5]">•</span>
+            Pahami bandar dan pola pergerakan saham untuk mengantisipasi manipulasi harga
           </li>
           <li className="flex items-start gap-3">
             <span className="mt-0.5 text-xl text-[#BDE8F5]">•</span>

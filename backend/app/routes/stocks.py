@@ -37,7 +37,6 @@ def _build_virtual_stock(ticker, stock=None):
         "sector": info.get("sector") or "-",
         "price": str(quote.get("price") or 0),
         "change": f"{(quote.get('changePercent') or 0):.2f}%",
-        "volume": str(quote.get("volume") or 0),
         "status": "Active",
         "lastUpdated": quote.get("updatedAt"),
         "created_at": None,
@@ -88,7 +87,6 @@ def create_stock():
     sector = (data.get("sector") or "").strip()
     price = data.get("price", 0)
     change_percent = (data.get("change") or data.get("change_percent") or "0.00%").strip()
-    volume = (data.get("volume") or "0").strip()
     status = (data.get("status") or "Active").strip()
 
     if not ticker:
@@ -108,7 +106,6 @@ def create_stock():
         sector=sector,
         price=price or 0,
         change_percent=change_percent,
-        volume=volume,
         status=status or "Active"
     )
 
@@ -133,7 +130,6 @@ def update_stock(stock_id):
     sector = (data.get("sector") or "").strip()
     price = data.get("price", 0)
     change_percent = (data.get("change") or data.get("change_percent") or "0.00%").strip()
-    volume = (data.get("volume") or "0").strip()
     status = (data.get("status") or "Active").strip()
 
     if not ticker or not name or not sector:
@@ -148,7 +144,6 @@ def update_stock(stock_id):
     stock.sector = sector
     stock.price = price or 0
     stock.change_percent = change_percent
-    stock.volume = volume
     stock.status = status or "Active"
     db.session.commit()
     log_stock_crud("UPDATE", stock.id, ticker, user_id=g.current_user.get("id"), ip_address=ip_address)

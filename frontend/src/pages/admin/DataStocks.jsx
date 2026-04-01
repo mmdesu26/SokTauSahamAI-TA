@@ -174,7 +174,7 @@ export default function AdminDataStocks() {
           Manajemen Data Saham
         </h1>
         <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
-          Kelola data master saham dengan Create, Read, Update, dan Delete
+          Kelola data master saham dengan Create, Read, Update, dan Delete untuk saham yang ditampilkan pada halaman user.
         </p>
       </section>
 
@@ -222,10 +222,7 @@ export default function AdminDataStocks() {
                   Perubahan
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
-                  Volume
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
-                  Update Terakhir
+                  Terakhir Diubah
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
                   Status
@@ -264,9 +261,6 @@ export default function AdminDataStocks() {
                     </td>
                     <td className="px-6 py-4 text-[#666666]">
                       {stock.change}
-                    </td>
-                    <td className="px-6 py-4 text-[#666666]">
-                      {stock.volume}
                     </td>
                     <td className="px-6 py-4 text-sm text-[#666666]">
                       {stock.lastUpdated}

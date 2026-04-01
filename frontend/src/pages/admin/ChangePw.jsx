@@ -109,18 +109,14 @@ export default function ChangePassword() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8 pb-16">
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-10">
-        <div className="flex items-start gap-4">
-          <div>
-            <h1 className="mb-2 text-4xl font-bold tracking-tight text-gray-800">
-              Ubah Password
-            </h1>
-            <p className="max-w-2xl text-lg text-gray-600">
-              Perbarui password admin untuk menjaga keamanan akun dan akses panel administrasi.
-            </p>
-          </div>
-        </div>
+    <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
+      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
+        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
+          Ubah Password
+        </h1>
+        <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
+          Perbarui password admin untuk menjaga keamanan akun dan akses panel administrasi.
+        </p>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
@@ -235,7 +231,7 @@ export default function ChangePassword() {
                 Gunakan kombinasi yang kuat
               </p>
               <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Sebaiknya gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol agar password lebih aman.
+                Gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol agar password lebih aman.
               </p>
             </div>
 

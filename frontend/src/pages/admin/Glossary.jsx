@@ -178,24 +178,30 @@ export default function AdminGlossary() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-10">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-2xl bg-[var(--color-admin)]/15 p-4">
-              <BookOpen className="h-7 w-7 text-[var(--color-admin)]" />
-            </div>
+      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
+      <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
+        Manajemen Data Glosarium
+      </h1>
 
-            <div>
-              <h1 className="mb-2 text-4xl font-bold tracking-tight text-gray-800">
-                CRUD Glosarium
-              </h1>
-              <p className="max-w-3xl text-lg text-gray-600">
-                Kelola istilah-istilah saham yang ditampilkan pada halaman user
-                agar konten tetap rapi, relevan, dan mudah dipahami.
-              </p>
-            </div>
-          </div>
+      <p className="max-w-3xl text-lg text-[#666666] md:text-xl text-justify">
+        Kelola data master glosarium dengan Create, Read, Update, dan Delete
+        untuk mengisi istilah-istilah saham yang ditampilkan pada halaman user.
+      </p>
+    </section>
 
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative mx-auto min-w-[260px] max-w-md flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cari istilah, singkatan, atau definisi..."
+            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-4 pl-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={openAddModal}
@@ -205,71 +211,28 @@ export default function AdminGlossary() {
             Tambah Istilah
           </button>
         </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
-              <Search className="h-5 w-5 text-[var(--color-admin)]" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Pencarian Glosarium
-              </h2>
-              <p className="text-sm text-gray-600">
-                Cari istilah atau definisi yang ingin dikelola.
-              </p>
-            </div>
-          </div>
-
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari istilah, singkatan, atau definisi..."
-              className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-4 pl-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-            />
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-          <h3 className="mb-4 text-xl font-bold text-gray-800">
-            Ringkasan Data
-          </h3>
-
-          <div className="space-y-4">
-            <div className="rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-4">
-              <p className="text-sm text-gray-600">Total Istilah</p>
-              <p className="mt-1 text-3xl font-bold text-gray-800">
-                {items.length}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-4">
-              <p className="text-sm text-gray-600">Hasil Pencarian</p>
-              <p className="mt-1 text-3xl font-bold text-gray-800">
-                {filteredItems.length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
 
       <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
-            <Info className="h-5 w-5 text-[var(--color-admin)]" />
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
+              <Info className="h-5 w-5 text-[var(--color-admin)]" />
+            </div>
+
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">
+                Daftar Istilah Glosarium
+              </h2>
+              <p className="text-sm text-gray-600">
+                Edit atau hapus istilah yang akan tampil di halaman user.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              Daftar Istilah Glosarium
-            </h2>
-            <p className="text-sm text-gray-600">
-              Edit atau hapus istilah yang akan tampil di halaman user.
-            </p>
+
+          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--color-admin)] px-5 py-2 text-sm font-semibold text-white shadow-sm">
+            <BookOpen className="h-4 w-4" />
+            Total Istilah: {items.length}
           </div>
         </div>
 

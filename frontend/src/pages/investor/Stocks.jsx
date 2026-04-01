@@ -39,7 +39,7 @@ export default function InvestorStocks() {
           Cari Saham
         </h1>
         <p className="max-w-3xl text-lg text-slate-300 md:text-xl">
-          Temukan saham yang diinginkan dengan analisis lengkap dan prediksi harga
+          Temukan saham yang diinginkan untuk diprediksi
         </p>
       </div>
 

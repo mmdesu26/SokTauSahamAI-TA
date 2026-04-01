@@ -117,7 +117,7 @@ export default function AdminLogs() {
         </h1>
         <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
           Monitor semua aktivitas sistem, error, dan status operasi secara
-          real-time
+          real-time.
         </p>
       </section>
 

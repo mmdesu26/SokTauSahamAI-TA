@@ -12,7 +12,16 @@ import { useAppAlert } from "@/components/AppAlertContext";
 function formatRelativeTime(timestamp) {
   if (!timestamp) return "-";
 
-  const date = new Date(timestamp);
+  const raw = String(timestamp).trim();
+
+  // paksa jadi UTC
+  const normalized = raw.includes("T")
+    ? raw
+    : raw.replace(" ", "T");
+
+  const utcValue = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
+
+  const date = new Date(utcValue);
   if (Number.isNaN(date.getTime())) return String(timestamp);
 
   const diffMs = Date.now() - date.getTime();
@@ -196,12 +205,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-12 pb-16">
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-10 shadow-sm">
-        <h1 className="mb-3 text-4xl font-bold text-gray-800">
+      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
+        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
           Admin Dashboard
         </h1>
-        <p className="text-lg text-gray-600">
-          Monitor kesehatan sistem dan aktivitas berdasarkan log asli
+        <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
+         Monitor aktivitas sistem berdasarkan log asli.
         </p>
       </section>
 

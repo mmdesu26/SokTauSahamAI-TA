@@ -69,7 +69,6 @@ class Stock(db.Model):
     sector = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Numeric(15, 2), nullable=False, server_default="0")
     change_percent = db.Column(db.String(20), nullable=False, server_default="0.00%")
-    volume = db.Column(db.String(50), nullable=False, server_default="0")
     status = db.Column(db.String(20), nullable=False, server_default="Active")
     created_at = db.Column(
         db.DateTime,
@@ -91,7 +90,6 @@ class Stock(db.Model):
             "sector": self.sector,
             "price": str(self.price) if self.price is not None else "0",
             "change": self.change_percent,
-            "volume": self.volume,
             "status": self.status,
             "lastUpdated": self.updated_at.strftime("%Y-%m-%d %H:%M") if self.updated_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
