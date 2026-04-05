@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { TrendingUp, AlertTriangle } from "lucide-react";
-
+import { TrendingUp, AlertTriangle, Building } from "lucide-react";
+import { getCompanyLogo } from "@/utils/logoHelper";
 import Button from "@/components/Button";
 import StockCandleChart from "@/components/StockCandleChart";
 import { apiFetch } from "@/lib/api";
@@ -177,6 +177,8 @@ export default function InvestorStockDetail() {
   };
 
   const profile = stockData?.profile || {};
+  const [imgError, setImgError] = useState(false);
+  const logoUrl = getCompanyLogo(profile.website);
   const fundamental = stockData?.fundamental || {};
   const chart = stockData?.chart || [];
   const stock = stockData?.stock || {};
@@ -301,9 +303,20 @@ export default function InvestorStockDetail() {
       <div className="rounded-3xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/50 via-blue-950/40 to-indigo-950/40 p-8 backdrop-blur-md md:p-10">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border border-cyan-400/25 bg-gradient-to-br from-cyan-600/25 to-blue-600/15 md:h-24 md:w-24">
-              <TrendingUp className="h-10 w-10 text-cyan-200" />
-            </div>
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-cyan-400/25 bg-gradient-to-br from-cyan-600/25 to-blue-600/15 md:h-24 md:w-24">
+            {logoUrl && !imgError ? (
+              <img
+                src={logoUrl}
+                alt={profile.longName || stock.name}
+                className="h-full w-full object-contain bg-white p-1"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-cyan-300">
+                <Building className="h-10 w-10" />
+              </div>
+            )}
+          </div>
 
             <div>
               <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
@@ -869,8 +882,7 @@ export default function InvestorStockDetail() {
                 <div className="text-center text-sm leading-relaxed text-slate-400">
                   <span className="font-semibold text-slate-300">Catatan interpretasi:</span>{" "}
                   Penilaian ini menggunakan standar umum rasio saham, seperti PER kurang dari 15 dianggap murah, PBV kurang dari 1 undervalued, 
-                  ROE kurang dari 15% dianggap baik, dan EPS positif menunjukkan perusahaan menghasilkan laba. Hasil ini hanya sebagai gambaran awal dan bukan analisis profesional.
-                  </div>
+                  ROE lebih dari 15% dianggap baik, dan EPS positif menunjukkan perusahaan menghasilkan laba. Hasil ini hanya sebagai gambaran awal dan bukan analisis profesional.             </div>
               </div>
             )}
           </div>
