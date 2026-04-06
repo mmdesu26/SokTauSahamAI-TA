@@ -1,119 +1,251 @@
 # Gambaran Sistem SokTauSahamAI
 
-Sistem ini adalah aplikasi web prediksi saham berbasis AI (Machine Learning) yang mengambil data dari yfinance. Sistem digunakan untuk menampilkan data saham, grafik candlestick, data fundamental, dan prediksi harga closing saham 1 bulan ke depan.
+SokTauSahamAI adalah web app analisis saham yang combine data market dari yfinance + machine learning sederhana.
+
+Fungsinya bukan cuma nampilin data saham, tapi juga kasih:
+- prediksi harga closing **besok (next trading day)**
+- insight fundamental untuk **3 bulan ke depan**
+
+---
 
 ## 1. Arsitektur Sistem
-Sistem terdiri dari 3 bagian utama:
-- Backend
-- Frontend
-- Database
+
+Sistem dibagi jadi 3 layer utama:
+- Backend (Python / API / ML logic)
+- Frontend (React UI)
+- Database (nyimpen ticker & log)
+
+---
 
 ## 2. Alur Sistem
+
 ### Alur Admin
-1. Admin login ke sistem
-2. Admin menambahkan ticker saham
-3. Backend memvalidasi ticker
-4. Backend mengambil data saham dari yfinance
-5. Data disimpan ke database
-6. Aktivitas dicatat ke system log
+1. Admin login
+2. Admin add ticker saham
+3. Backend validasi ticker ke yfinance
+4. Data basic disimpan ke database
+5. Aktivitas dicatat ke system log
+
+---
 
 ### Alur User
-1. User membuka halaman saham
-2. User melihat data saham dan candlestick
-3. User membuka data fundamental
-4. User menekan tombol prediksi
-5. Backend menjalankan machine learning
-6. Hasil prediksi ditampilkan ke frontend
+1. User buka halaman detail saham
+2. Sistem fetch:
+   - profil perusahaan
+   - candlestick
+3. User bisa buka:
+   - tab deskripsi
+   - tab fundamental
+4. User klik tombol **Prediksi**
+5. Backend jalanin model ML (on demand)
+6. Hasil dikirim ke frontend dan ditampilkan
+
+---
 
 ## 3. Sumber Data
-Sumber data utama berasal dari yfinance, yaitu:
-- harga historis saham
-- harga closing saham
-- profil perusahaan
-- rasio fundamental: EPS, ROE, PBV, PER
 
-## 4. Machine Learning Prediksi Saham
-Fitur machine learning digunakan untuk memprediksi **harga closing saham 1 bulan ke depan**.
+Semua data diambil dari **yfinance**:
+- harga historis (daily)
+- harga intraday (candlestick)
+- profil perusahaan
+- fundamental:
+  - EPS
+  - ROE
+  - PBV
+  - PER
+
+---
+
+## 4. Machine Learning (Model Harga)
+
+### Tujuan
+Prediksi:
+- **harga closing 1 hari ke depan (next trading day)**
+
+---
+
+### Cara Kerja Model
+
+Model tidak langsung prediksi harga, tapi:
+
+1. model belajar return (persentase perubahan harga)
+2. hasil return dikonversi lagi ke harga
+
+---
+
+### Data yang dipakai
+- closing price historis
+- lag data (close 1–10 hari sebelumnya)
+
+Tidak pakai:
+- indikator teknikal (RSI, MACD, dll)
+- fundamental
+
+---
 
 ### Model yang digunakan
-Sistem menggunakan metode ensemble learning, yaitu gabungan:
-- Random Forest = 60%
-- Linear Regression = 40%
+- Random Forest
+- Linear Regression
 
-### Fitur yang digunakan
-Model hanya menggunakan rasio fundamental:
-- EPS
-- ROE
-- PBV
-- PER
+---
 
-### Target prediksi
-Target yang diprediksi adalah:
-- harga closing saham 1 bulan ke depan
-- dalam implementasi dihitung sekitar 20 hari bursa ke depan
+### Cara gabung (ensemble)
 
-### Evaluasi model
-Untuk mengukur performa model, digunakan:
-- MSE
-- RMSE
-- MAE
-- MAPE
+Tidak fixed lagi.
 
-Evaluasi dilakukan dengan metode:
-- time-series holdout split
+Sekarang:
+- bobot dihitung dari performa (RMSE)
+- model lebih akurat → bobot lebih besar
 
-Artinya, data lama dipakai untuk training dan data terbaru dipakai untuk testing agar hasil evaluasi lebih valid.
+---
 
-### Output prediksi
-Hasil yang ditampilkan:
-- harga prediksi closing 1 bulan ke depan
-- hasil prediksi Random Forest
-- hasil prediksi Linear Regression
-- bobot ensemble 60% RF dan 40% LR
+### Output Model Harga
+
+Yang dihasilkan:
+- prediksi closing besok
+- hasil RF
+- hasil LR
+- bobot masing-masing model
 - expected change (%)
-- rekomendasi BUY / HOLD / SELL
-- nilai MSE, RMSE, MAE, dan MAPE
+- rekomendasi harga (BUY / HOLD / SELL)
 
-### Catatan penting
-Prediksi tidak disimpan permanen di database, tetapi dijalankan saat user menekan tombol prediksi. Dengan begitu, hasil prediksi selalu berdasarkan data terbaru yang tersedia.
+---
 
-## 5. Candlestick
-Sistem tetap menampilkan grafik candlestick untuk membantu user membaca pergerakan harga saham.
+## 5. Evaluasi Model
 
-## 6. Data Fundamental
-Data fundamental yang ditampilkan:
+Model dievaluasi pakai data historis
+
+### Metode
+- time-series split (bukan random)
+  - data lama → training
+  - data terbaru → testing
+
+---
+
+### Metrik
+- RMSE → selisih rata-rata dalam rupiah
+- MAPE → selisih rata-rata dalam persen
+
+---
+
+### Catatan
+- RMSE dihitung dari selisih harga prediksi vs harga asli
+- bukan dari 1 prediksi, tapi dari seluruh data test
+
+---
+
+## 6. Model Fundamental (Terpisah)
+
+Model fundamental tidak dipakai untuk prediksi harga harian
+
+Dipakai untuk:
+- estimasi return 3 bulan
+- arah (naik / turun)
+- rekomendasi
+
+---
+
+### Input
 - EPS
 - ROE
 - PBV
 - PER
 
-## 7. System Log
-System log mencatat aktivitas seperti:
-- login
-- tambah saham
-- ubah data
-- hapus data
-- proses prediksi
-- error sistem
+---
 
-## 8. API Utama
-Contoh endpoint utama:
+### Cara kerja
+- rule-based scoring (bukan ML training)
+- tiap rasio dikasih skor
+- total skor → jadi estimasi return %
+
+---
+
+### Output
+- return 3 bulan (%)
+- arah (Naik / Turun)
+- rekomendasi (BUY / HOLD / SELL)
+
+---
+
+## 7. Candlestick
+
+Grafik candlestick:
+- pakai data intraday dari yfinance
+- hanya untuk visualisasi
+- bukan input ke model
+
+---
+
+## 8. Perbedaan Harga (Penting)
+
+Ada 2 jenis harga:
+
+### Close data model
+- harga penutupan harian terakhir yang sudah completed
+- dipakai model sebagai acuan
+
+### Harga chart
+- dari candlestick (intraday)
+- bisa beda karena lebih update
+
+---
+
+## 9. Prediksi On-Demand
+
+Prediksi:
+- tidak disimpan di database
+- dihitung saat user klik tombol
+
+Tujuannya:
+- selalu pakai data terbaru
+- tidak stale
+
+---
+
+## 10. API Utama
+
+Endpoint utama:
+
 - GET /api/stocks
 - GET /api/stocks/{ticker}/detail
 - GET /api/stocks/{ticker}/candlestick
 - GET /api/stocks/{ticker}/prediction
 - GET /api/stocks/{ticker}/fundamentals
+
+Admin:
 - POST /api/admin/stocks
 - PUT /api/admin/stocks/{id}
 - DELETE /api/admin/stocks/{id}
 - GET /api/admin/logs
 
-## 9. Kesimpulan
-Sistem SokTauSahamAI adalah aplikasi prediksi saham berbasis web yang menggabungkan:
-- data pasar dari yfinance
-- data fundamental perusahaan
-- machine learning ensemble Random Forest dan Linear Regression
-- visualisasi candlestick
-- system logging
+---
 
-Fokus utama sistem adalah memprediksi harga closing saham 1 bulan ke depan menggunakan rasio fundamental EPS, ROE, PBV, dan PER.
+## 11. System Log
+
+System log nyimpen:
+- login
+- tambah saham
+- update
+- delete
+- prediksi
+- error
+
+---
+
+## 12. Kesimpulan
+
+SokTauSahamAI adalah web app analisis saham yang combine:
+
+- data market dari yfinance
+- model harga (RF + LR)
+- model fundamental (rule-based)
+- candlestick visualization
+
+Fokus utama:
+- prediksi harga **besok**
+- insight arah **3 bulan ke depan**
+
+Model dibuat simple, explainable, dan tidak pakai indikator teknikal kompleks.
+
+
+Sistem tahu harga terakhir itu sudah completed karena dia cuma ambil data sebelum hari ini. Jadi selama hari ini masih berjalan atau bahkan sudah tutup, sistem tetap pakai hari sebelumnya untuk memastikan datanya benar-benar final dan tidak berubah lagi.

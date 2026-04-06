@@ -460,6 +460,10 @@ export default function InvestorStockDetail() {
                       <h2 className="text-xl font-bold text-cyan-200 md:text-2xl">
                         Hasil Prediksi Harga Closing Besok dan Arah Tren 3 Bulan ke Depan
                       </h2>
+                      <h2 className="text-xl text-cyan-100 md:text-1xl">
+                       (Disarankan melakukan prediksi sebelum market buka 
+                       keesokan hari agar menggunakan harga penutupan harian terbaru yang sudah final)
+                      </h2>
                     </div>
 
                     <div className="flex w-full flex-col gap-6">
