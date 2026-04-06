@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { TrendingUp, AlertTriangle, Building } from "lucide-react";
+import { AlertTriangle, Building } from "lucide-react";
 import { getCompanyLogo } from "@/utils/logoHelper";
 import Button from "@/components/Button";
 import StockCandleChart from "@/components/StockCandleChart";
@@ -87,8 +87,6 @@ export default function InvestorStockDetail() {
   const { ticker = "" } = useParams();
 
   const [timeframe, setTimeframe] = useState("1D");
-
-  // default tab langsung ke deskripsi biar pas buka ga kosong
   const [activeTab, setActiveTab] = useState("deskripsi");
 
   const [isLoading, setIsLoading] = useState(true);
@@ -98,9 +96,9 @@ export default function InvestorStockDetail() {
   const [stockData, setStockData] = useState(null);
   const [predictionData, setPredictionData] = useState(null);
   const [fundamentalsData, setFundamentalsData] = useState(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
-    // kalau pindah ticker, balikin lagi ke tab deskripsi
     setActiveTab("deskripsi");
 
     const fetchStockDetail = async () => {
@@ -177,12 +175,10 @@ export default function InvestorStockDetail() {
   };
 
   const profile = stockData?.profile || {};
-  const [imgError, setImgError] = useState(false);
-  const logoUrl = getCompanyLogo(profile.website);
   const fundamental = stockData?.fundamental || {};
   const chart = stockData?.chart || [];
-  const stock = stockData?.stock || {};
   const chartMeta = stockData?.chartMeta || {};
+  const logoUrl = getCompanyLogo(profile.website);
 
   const candles = useMemo(() => {
     return chart.map((c) => ({
@@ -215,21 +211,21 @@ export default function InvestorStockDetail() {
     }`;
 
   const closeToday = predictionData?.current_price || Number(last.close || 0);
-  const predClose1Mo = predictionData?.predicted_close_1m || closeToday;
-  const predDelta = predClose1Mo - closeToday;
-  const predPct =
-    predictionData?.expected_change_pct ||
+  const closeTodayDate = predictionData?.current_price_date || "-";
+  const predCloseNextDay = predictionData?.predicted_close_next_day || closeToday;
+  const predDelta = predCloseNextDay - closeToday;
+
+  const pricePredPct =
+    predictionData?.price_expected_change_pct ??
     (closeToday === 0 ? 0 : (predDelta / closeToday) * 100);
 
   const rmse = predictionData?.rmse || 0;
-  const mse = predictionData?.mse || 0;
-  const trendDirection = predClose1Mo > closeToday ? "Naik" : "Turun";
+  const mape = predictionData?.mape || 0;
 
-  const recommendation = useMemo(() => {
-    if (predPct > 3) return "BUY";
-    if (predPct >= -3 && predPct <= 3) return "HOLD";
-    return "SELL";
-  }, [predPct]);
+  const fundamentalPrediction = predictionData?.fundamental_prediction || {};
+  const fundamentalReturn3M = Number(fundamentalPrediction?.estimated_return_pct_3m || 0);
+  const fundamentalDirection = fundamentalPrediction?.direction_3m || "Netral";
+  const recommendation = fundamentalPrediction?.recommendation || "HOLD";
 
   const recommendationPillClass = useMemo(() => {
     if (recommendation === "BUY") {
@@ -304,27 +300,27 @@ export default function InvestorStockDetail() {
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-6">
             <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-cyan-400/25 bg-gradient-to-br from-cyan-600/25 to-blue-600/15 md:h-24 md:w-24">
-            {logoUrl && !imgError ? (
-              <img
-                src={logoUrl}
-                alt={profile.longName || stock.name}
-                className="h-full w-full object-contain bg-white p-1"
-                onError={() => setImgError(true)}
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-cyan-300">
-                <Building className="h-10 w-10" />
-              </div>
-            )}
-          </div>
+              {logoUrl && !imgError ? (
+                <img
+                  src={logoUrl}
+                  alt={profile.longName || "-"}
+                  className="h-full w-full object-contain bg-white p-1"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-cyan-300">
+                  <Building className="h-10 w-10" />
+                </div>
+              )}
+            </div>
 
             <div>
               <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
                 {ticker.toUpperCase()}
               </h1>
-              <p className="mt-1 text-xl text-slate-300">{profile.longName || stock.name}</p>
+              <p className="mt-1 text-xl text-slate-300">{profile.longName || "-"}</p>
               <p className="text-lg text-cyan-300/80">
-                {profile.sector || stock.sector} • {profile.industry || "-"}
+                {profile.sector || "-"} • {profile.industry || "-"}
               </p>
             </div>
           </div>
@@ -380,7 +376,9 @@ export default function InvestorStockDetail() {
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900/65 p-6 backdrop-blur-md">
         <p className="ml-2.5 text-left text-xs text-slate-200/70">
-          Source: {chartMeta.source || "yfinance"} • Interval: {formatChartIntervalLabel(chartMeta.interval, timeframe)} • Update terbaru: {formatChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
+          Source: {chartMeta.source || "yfinance"} • Interval:{" "}
+          {formatChartIntervalLabel(chartMeta.interval, timeframe)} • Update terbaru:{" "}
+          {formatChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
         </p>
         <p className="ml-2.5 mt-1 text-left text-xs text-amber-200/90">
           Data ini bukan harga realtime dan grafik hanya visualisasi historis dari yfinance, bukan harga prediksi.
@@ -444,8 +442,7 @@ export default function InvestorStockDetail() {
               <div className="space-y-6">
                 {isPredicting ? (
                   <div className="py-12 text-center text-slate-400">
-                    Menjalankan prediksi pakai Random Forest + Linear Regression dari data OHLC
-                    historis dan rasio fundamental...
+                    Menjalankan model harga (Random Forest + Linear Regression) dan analisis fundamental 3 bulan...
                   </div>
                 ) : !predictionData ? (
                   <div className="py-12 text-center text-slate-400">
@@ -459,45 +456,61 @@ export default function InvestorStockDetail() {
                   </div>
                 ) : (
                   <>
-                    {/* ini header buat hasil prediksi */}
                     <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-6 py-4 text-center">
                       <h2 className="text-xl font-bold text-cyan-200 md:text-2xl">
-                        Hasil Prediksi Harga Closing dan Arah Tren 1 Bulan Kedepan
+                        Hasil Prediksi Harga Closing Besok dan Arah Tren 3 Bulan ke Depan
                       </h2>
                     </div>
 
-                    {/* hasil prediksi dibikin turun ke bawah semua */}
                     <div className="flex w-full flex-col gap-6">
                       <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
-                          Harga Perkiraan Closing 
+                          Harga Perkiraan Closing
                         </h3>
 
                         <div className="space-y-3 text-slate-300">
                           <div className="flex items-center justify-between gap-4">
-                            <span>Harga sekarang (Close)</span>
+                            <span>Close terakhir (data model)</span>
                             <span className="text-right font-semibold text-white">
                               {formatIDR(closeToday)}
                             </span>
                           </div>
 
+                          <p className="text-xs text-slate-400 mt-2">
+                            * Menggunakan harga penutupan harian terakhir yang sudah completed dari data historis.
+                          </p>
+
                           <div className="flex items-center justify-between gap-4">
-                            <span>Prediksi closing 1 bulan</span>
+                            <span>Tanggal close data model</span>
                             <span className="text-right font-semibold text-white">
-                              {formatIDR(predClose1Mo)}
+                              {closeTodayDate}
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between gap-4">
-                            <span>Selisih</span>
+                            <span>Harga saat ini (chart)</span>
+                            <span className="text-right font-semibold text-white">
+                              {formatIDR(Number(last.close || 0))}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Prediksi closing besok</span>
+                            <span className="text-right font-semibold text-white">
+                              {formatIDR(predCloseNextDay)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Selisih terhadap close data model</span>
                             <span
                               className={`text-right font-bold ${
                                 predDelta >= 0 ? "text-emerald-300" : "text-red-300"
                               }`}
                             >
                               {predDelta >= 0 ? "+" : ""}
-                              {formatIDR(predDelta)} ({predPct >= 0 ? "+" : ""}
-                              {predPct.toFixed(2)}%)
+                              {formatIDR(predDelta)} ({pricePredPct >= 0 ? "+" : ""}
+                              {pricePredPct.toFixed(2)}%)
                             </span>
                           </div>
 
@@ -519,25 +532,39 @@ export default function InvestorStockDetail() {
 
                       <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
                         <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
-                          Arah Tren & Rekomendasi
+                          Arah Tren & Rekomendasi 3 Bulan ke Depan
                         </h3>
 
                         <div className="space-y-4">
                           <div className="flex items-center justify-between gap-4">
-                            <span className="text-slate-300">Arah tren</span>
+                            <span className="text-slate-300">Return 3 bulan (fundamental)</span>
                             <span
                               className={`rounded-full border px-4 py-1 font-semibold ${
-                                trendDirection === "Naik"
+                                fundamentalReturn3M >= 0
                                   ? "border-emerald-500/25 bg-emerald-500/15 text-emerald-300"
                                   : "border-red-500/25 bg-red-500/15 text-red-300"
                               }`}
                             >
-                              {trendDirection}
+                              {fundamentalReturn3M >= 0 ? "+" : ""}
+                              {fundamentalReturn3M.toFixed(2)}%
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between gap-4">
-                            <span className="text-slate-300">Rekomendasi</span>
+                            <span className="text-slate-300">Arah 3 bulan (fundamental)</span>
+                            <span
+                              className={`rounded-full border px-4 py-1 font-semibold ${
+                                fundamentalDirection === "Naik"
+                                  ? "border-emerald-500/25 bg-emerald-500/15 text-emerald-300"
+                                  : "border-red-500/25 bg-red-500/15 text-red-300"
+                              }`}
+                            >
+                              {fundamentalDirection}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-slate-300">Rekomendasi fundamental</span>
                             <span
                               className={`rounded-full border px-4 py-1 font-semibold ${recommendationPillClass}`}
                             >
@@ -546,41 +573,55 @@ export default function InvestorStockDetail() {
                           </div>
 
                           <div className="space-y-2 pt-2 text-sm leading-relaxed text-slate-400">
-                            <p>Model: Random Forest + Linear Regression</p>
-                            <p>Rasio yfinance: PER, EPS, PBV, ROE</p>
-                            <p>Tidak pakai indikator teknikal tambahan.</p>
+                            <p>Model harga: Random Forest + Linear Regression</p>
+                            <p>Input model harga: lag closing price historis</p>
+                            <p>Analisis fundamental: EPS, PER, PBV, ROE</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
-                        <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
-                          Metrik Akurasi Model ML
-                        </h3>
+                      <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
+                        Akurasi Prediksi Model Harga
+                      </h3>
 
-                        <div className="space-y-3 text-slate-300">
-                          <div className="flex items-center justify-between gap-4">
-                            <span>RMSE</span>
-                            <span className="text-right font-semibold text-white">
-                              {rmse.toFixed(2)}
-                            </span>
-                          </div>
+                      <div className="space-y-3 text-slate-300">
+                        <div className="flex items-center justify-between gap-4">
+                          <span>RMSE</span>
+                          <span className="text-right font-semibold text-white">
+                            {rmse.toFixed(2)}
+                          </span>
+                        </div>
 
-                          <div className="flex items-center justify-between gap-4">
-                            <span>MSE</span>
-                            <span className="text-right font-semibold text-white">
-                              {mse.toFixed(2)}
-                            </span>
-                          </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span>MAPE</span>
+                          <span className="text-right font-semibold text-white">
+                            {mape.toFixed(2)}%
+                          </span>
+                        </div>
 
-                          <div className="flex items-center justify-between gap-4">
-                            <span>Waktu Prediksi</span>
-                            <span className="text-right font-semibold text-white">
-                              {predictionData?.prediction_date || "-"}
-                            </span>
-                          </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span>Waktu Prediksi</span>
+                          <span className="text-right font-semibold text-white">
+                            {predictionData?.prediction_date || "-"}
+                          </span>
                         </div>
                       </div>
+
+                      <div className="mt-4 rounded-lg border border-slate-700/60 bg-slate-900/30 p-4 text-sm leading-relaxed text-slate-400">
+                        <p className="font-medium text-slate-300">Cara baca akurasi</p>
+                        <p className="mt-2">
+                          RMSE menunjukkan rata-rata selisih hasil prediksi terhadap harga aktual
+                          dalam satuan rupiah.
+                        </p>
+                        <p className="mt-1">
+                          MAPE menunjukkan rata-rata persentase error prediksi terhadap harga aktual.
+                        </p>
+                        <p className="mt-1">
+                          Semakin kecil nilai RMSE dan MAPE, maka prediksi model semakin baik.
+                        </p>
+                      </div>
+                    </div>
 
                       <div className="flex gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-5 text-slate-200">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
@@ -588,9 +629,11 @@ export default function InvestorStockDetail() {
                         <div>
                           <p className="font-semibold text-amber-200">Disclaimer</p>
                           <p className="mt-1 text-sm leading-relaxed text-slate-300/90">
-                            Prediksi ini pakai Random Forest dan Linear Regression dengan input
-                            OHLC historis tertutup serta rasio fundamental dari yfinance. Hasil
-                            bukan kepastian dan bukan rekomendasi investasi.
+                            Sistem ini memisahkan model harga dan analisis fundamental. Prediksi harga
+                            dibuat dengan Random Forest dan Linear Regression berbasis histori closing,
+                            sedangkan return 3 bulan, arah, dan rekomendasi berasal dari analisis
+                            fundamental EPS, PER, PBV, dan ROE. Hasil bukan kepastian dan bukan
+                            rekomendasi investasi.
                           </p>
                         </div>
                       </div>
@@ -717,9 +760,7 @@ export default function InvestorStockDetail() {
 
                     <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/35">
                       <div className="border-b border-slate-700/60 px-5 py-4 text-center">
-                        <p className="font-semibold text-white">
-                          Rasio Fundamental
-                        </p>
+                        <p className="font-semibold text-white">Rasio Fundamental</p>
                       </div>
 
                       <div className="overflow-x-auto">
@@ -881,8 +922,11 @@ export default function InvestorStockDetail() {
 
                 <div className="text-center text-sm leading-relaxed text-slate-400">
                   <span className="font-semibold text-slate-300">Catatan interpretasi:</span>{" "}
-                  Penilaian ini menggunakan standar umum rasio saham, seperti PER kurang dari 15 dianggap murah, PBV kurang dari 1 undervalued, 
-                  ROE lebih dari 15% dianggap baik, dan EPS positif menunjukkan perusahaan menghasilkan laba. Hasil ini hanya sebagai gambaran awal dan bukan analisis profesional.             </div>
+                  Penilaian ini menggunakan standar umum rasio saham, seperti PER kurang dari 15
+                  dianggap murah, PBV kurang dari 1 undervalued, ROE lebih dari 15% dianggap baik,
+                  dan EPS positif menunjukkan perusahaan menghasilkan laba. Hasil ini hanya sebagai
+                  gambaran awal dan bukan analisis profesional.
+                </div>
               </div>
             )}
           </div>

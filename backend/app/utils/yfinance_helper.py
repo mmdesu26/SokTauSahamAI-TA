@@ -1,10 +1,10 @@
-import yfinance as yf  # library buat ambil data saham dari Yahoo Finance
-from datetime import datetime, timedelta  # buat ngatur waktu / tanggal
+import yfinance as yf
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-import logging  # buat nampilin log error
-from app.utils.text_helper import TextHelper  # helper buat translate text
+import logging
+from app.utils.text_helper import TextHelper
 
-logger = logging.getLogger(__name__)  # bikin logger buat debug/error
+logger = logging.getLogger(__name__)
 
 
 class YFinanceHelper:
@@ -14,15 +14,14 @@ class YFinanceHelper:
 
     @staticmethod
     def normalize_symbol(ticker: str) -> str:
-        symbol = (ticker or "").strip().upper()  # rapihin ticker: hapus spasi, jadi huruf besar
+        symbol = (ticker or "").strip().upper()
         if not symbol:
-            return symbol  # kalau kosong, balikin kosong
+            return symbol
 
-        # kalau udah format khusus, ga usah ditambahin .JK
         if symbol.startswith("^") or "=" in symbol or symbol.endswith(".JK"):
             return symbol
 
-        return f"{symbol}.JK"  # default anggap saham indonesia, jadi ditambah .JK
+        return f"{symbol}.JK"
 
     @staticmethod
     def _to_jakarta_naive(dt_value):
@@ -39,67 +38,80 @@ class YFinanceHelper:
         return dt_value.strftime("%Y-%m-%d %H:%M")
 
     @staticmethod
+    def _normalize_history_index_to_jakarta(hist):
+        if hist is None or hist.empty:
+            return hist
+
+        hist = hist.copy()
+
+        if getattr(hist.index, "tz", None) is not None:
+            hist.index = hist.index.tz_convert(YFinanceHelper.JAKARTA_TZ).tz_localize(None)
+        else:
+            hist.index = hist.index.tz_localize(None)
+
+        return hist.sort_index()
+
+    @staticmethod
     def get_latest_quote(ticker: str):
-        symbol = YFinanceHelper.normalize_symbol(ticker)  # ubah ticker ke format yg sesuai
+        symbol = YFinanceHelper.normalize_symbol(ticker)
         try:
-            stock = yf.Ticker(symbol)  # ambil object saham
-            hist = stock.history(period="5d", interval="1d", auto_adjust=False)  # ambil data 5 hari terakhir
+            stock = yf.Ticker(symbol)
+            hist = stock.history(period="10d", interval="1d", auto_adjust=False)
 
-            if hist.empty:
-                return {}  # kalau ga ada data, balikin dict kosong
-
-            hist = hist.dropna(subset=["Close"]).copy()  # hapus baris yg close-nya kosong
             if hist.empty:
                 return {}
 
-            latest = hist.iloc[-1]  # data paling baru
-            previous = hist.iloc[-2] if len(hist) > 1 else None  # data sebelumnya kalau ada
+            hist = hist.dropna(subset=["Close"]).copy()
+            hist = YFinanceHelper._normalize_history_index_to_jakarta(hist)
 
-            latest_dt = hist.index[-1]  # tanggal data terakhir
+            if hist.empty:
+                return {}
 
-            latest_dt = YFinanceHelper._to_jakarta_naive(latest_dt)
+            latest = hist.iloc[-1]
+            previous = hist.iloc[-2] if len(hist) > 1 else None
 
-            current_price = float(latest.get("Close", 0) or 0)  # harga close terbaru
-            previous_price = float(previous.get("Close", 0) or 0) if previous is not None else None  # harga close sebelumnya
+            latest_dt = hist.index[-1]
+
+            current_price = float(latest.get("Close", 0) or 0)
+            previous_price = float(previous.get("Close", 0) or 0) if previous is not None else None
 
             change_pct = None
             if previous_price not in (None, 0):
-                change_pct = ((current_price - previous_price) / previous_price) * 100  # hitung persen perubahan
+                change_pct = ((current_price - previous_price) / previous_price) * 100
 
             return {
-                "price": current_price,  # harga sekarang
-                "changePercent": change_pct,  # persentase naik/turun
-                "date": latest_dt.strftime("%Y-%m-%d"),  # tanggal data
-                "updatedAt": YFinanceHelper._format_dt(latest_dt),  # tanggal + jam update
-                "source": "yfinance",  # sumber data
-                "symbol": symbol,  # simbol saham final
+                "price": current_price,
+                "changePercent": change_pct,
+                "date": latest_dt.strftime("%Y-%m-%d"),
+                "updatedAt": YFinanceHelper._format_dt(latest_dt),
+                "source": "yfinance",
+                "symbol": symbol,
             }
 
         except Exception as e:
-            logger.error(f"Error fetching latest quote for {symbol}: {str(e)}")  # log kalau error
+            logger.error(f"Error fetching latest quote for {symbol}: {str(e)}")
             return {}
 
     @staticmethod
     def get_stock_info(ticker, translate_summary=True):
+        symbol = YFinanceHelper.normalize_symbol(ticker)
         try:
-            symbol = YFinanceHelper.normalize_symbol(ticker)  # format ticker
-            stock = yf.Ticker(symbol)  # object saham
-            info = stock.info  # info detail perusahaan
+            stock = yf.Ticker(symbol)
+            info = stock.info
 
-            summary = info.get("longBusinessSummary", "") or ""  # deskripsi perusahaan
+            summary = info.get("longBusinessSummary", "") or ""
             translated_summary = TextHelper.translate_to_indonesian(summary) if translate_summary else summary
-            # kalau translate_summary=True, summary diterjemahin ke indo
 
             return {
-                "longName": info.get("longName", ""),  # nama panjang perusahaan
-                "shortName": info.get("shortName", ""),  # nama singkat
-                "sector": info.get("sector", ""),  # sektor
-                "industry": info.get("industry", ""),  # industri
-                "website": info.get("website", ""),  # website resmi
-                "city": info.get("city", ""),  # kota
-                "country": info.get("country", ""),  # negara
-                "longBusinessSummary": translated_summary,  # summary versi indo
-                "longBusinessSummaryOriginal": summary,  # summary asli
+                "longName": info.get("longName", ""),
+                "shortName": info.get("shortName", ""),
+                "sector": info.get("sector", ""),
+                "industry": info.get("industry", ""),
+                "website": info.get("website", ""),
+                "city": info.get("city", ""),
+                "country": info.get("country", ""),
+                "longBusinessSummary": translated_summary,
+                "longBusinessSummaryOriginal": summary,
             }
 
         except Exception as e:
@@ -108,30 +120,28 @@ class YFinanceHelper:
 
     @staticmethod
     def get_fundamentals(ticker):
+        symbol = YFinanceHelper.normalize_symbol(ticker)
         try:
-            symbol = YFinanceHelper.normalize_symbol(ticker)  # format ticker
             stock = yf.Ticker(symbol)
-            info = stock.info  # ambil info fundamental
+            info = stock.info
 
-            eps = info.get("trailingEps", None)  # EPS
-            current_price = info.get("currentPrice", 0)  # harga sekarang
-            book_value_per_share = info.get("bookValue", 0)  # nilai buku per saham
+            eps = info.get("trailingEps", None)
+            current_price = info.get("currentPrice", 0)
+            book_value_per_share = info.get("bookValue", 0)
 
             pbv = current_price / book_value_per_share if book_value_per_share else None
-            # PBV = harga saham / book value per share
 
-            roe = info.get("returnOnEquity", None)  # ROE biasanya dalam desimal
+            roe = info.get("returnOnEquity", None)
             if roe is not None:
-                roe = roe * 100  # ubah ke persen
+                roe = roe * 100
 
-            pe = info.get("trailingPE", None)  # PER
+            pe = info.get("trailingPE", None)
 
-            # data tambahan buat rawData
-            revenue = info.get("totalRevenue", None)  # total pendapatan
-            net_income = info.get("netIncomeToCommon", None)  # laba bersih
-            total_assets = info.get("totalAssets", None)  # total aset
-            total_equity = info.get("totalEquity", None)  # total ekuitas
-            market_cap = info.get("marketCap", None)  # market cap
+            revenue = info.get("totalRevenue", None)
+            net_income = info.get("netIncomeToCommon", None)
+            total_assets = info.get("totalAssets", None)
+            total_equity = info.get("totalEquity", None)
+            market_cap = info.get("marketCap", None)
 
             return {
                 "eps": eps,
@@ -154,102 +164,99 @@ class YFinanceHelper:
             return {}
 
     @staticmethod
-    def get_ohlc_data(ticker, days=252, exclude_today=True):
-        try:
-            end_date = datetime.now()  # tanggal akhir = sekarang
-            start_date = end_date - timedelta(days=days + 5)
-            # ambil lebih dari jumlah hari yg diminta, buat jaga2 kalau ada hari libur
-
-            symbol = YFinanceHelper.normalize_symbol(ticker)
-            stock = yf.Ticker(symbol)
-            hist = stock.history(start=start_date, end=end_date, interval="1d", auto_adjust=False)
-            # ambil data harian OHLC
-
-            if hist.empty:
-                logger.warning(f"No historical data found for {symbol}")
-                return []
-
-            today_key = datetime.now().strftime("%Y-%m-%d")  # tanggal hari ini
-            data = []
-
-            for date, row in hist.iterrows():
-                date_key = date.strftime("%Y-%m-%d")
-
-                if exclude_today and date_key >= today_key:
-                    continue  # kalau exclude_today aktif, data hari ini dilewati
-
-                data.append({
-                    "date": date_key,  # tanggal
-                    "open": float(row["Open"]),  # harga buka
-                    "high": float(row["High"]),  # harga tertinggi
-                    "low": float(row["Low"]),  # harga terendah
-                    "close": float(row["Close"]),  # harga tutup
-                    "timestamp": int(date.timestamp()),  # timestamp unix
-                })
-
-            return data[-days:]  # balikin sesuai jumlah hari yg diminta
-
-        except Exception as e:
-            logger.error(f"Error fetching OHLC data for {symbol}: {str(e)}")
-            return []
-
-    @staticmethod
     def get_historical_prices(ticker, days=252, exclude_today=True):
+        """
+        Ambil data daily historical yang stabil untuk model.
+        Pakai period agar tidak bermasalah dengan timezone/start-end.
+        """
+        symbol = YFinanceHelper.normalize_symbol(ticker)
         try:
-            end_date = datetime.now()  # waktu akhir
-            start_date = end_date - timedelta(days=days + 5)  # waktu awal + buffer
-
-            symbol = YFinanceHelper.normalize_symbol(ticker)
             stock = yf.Ticker(symbol)
-            hist = stock.history(start=start_date, end=end_date, interval="1d", auto_adjust=False)
+
+            # buffer lebih panjang supaya tetap cukup setelah filter hari ini / hari libur
+            period_days = max(days + 20, 60)
+            hist = stock.history(period=f"{period_days}d", interval="1d", auto_adjust=False)
 
             if hist.empty:
                 logger.warning(f"No historical data found for {symbol}")
                 return None
 
-            hist = hist.copy()
+            hist = hist.dropna(subset=["Close"]).copy()
+            hist = YFinanceHelper._normalize_history_index_to_jakarta(hist)
 
-            # kalau index ada timezone, dihapus dulu biar aman
-            hist.index = hist.index.tz_localize(None) if getattr(hist.index, 'tz', None) is not None else hist.index
+            if hist.empty:
+                return None
 
             if exclude_today:
-                today = datetime.now().date()
-                hist = hist[hist.index.date < today]  # buang data hari ini
+                today_jakarta = datetime.now(YFinanceHelper.JAKARTA_TZ).date()
+                hist = hist[hist.index.date < today_jakarta]
 
-            return hist.tail(days)  # ambil data paling akhir sesuai jumlah hari
+            hist = hist.tail(days)
+
+            if hist.empty:
+                logger.warning(f"Historical data empty after filtering for {symbol}")
+                return None
+
+            return hist
 
         except Exception as e:
             logger.error(f"Error fetching historical prices for {symbol}: {str(e)}")
             return None
 
     @staticmethod
-    def get_intraday_ohlc(ticker, interval="60m", period="5d"):
+    def get_last_completed_daily_close(ticker):
+        """
+        Ambil close harian terakhir yang sudah completed.
+        Ini yang seharusnya dipakai model sebagai anchor current price.
+        """
+        symbol = YFinanceHelper.normalize_symbol(ticker)
         try:
-            symbol = YFinanceHelper.normalize_symbol(ticker)
+            hist = YFinanceHelper.get_historical_prices(symbol, days=10, exclude_today=True)
+            if hist is None or hist.empty:
+                return None
+
+            last_dt = hist.index[-1]
+            last_row = hist.iloc[-1]
+
+            return {
+                "date": last_dt.strftime("%Y-%m-%d"),
+                "updatedAt": YFinanceHelper._format_dt(last_dt),
+                "close": float(last_row.get("Close", 0) or 0),
+                "open": float(last_row.get("Open", 0) or 0),
+                "high": float(last_row.get("High", 0) or 0),
+                "low": float(last_row.get("Low", 0) or 0),
+                "symbol": symbol,
+                "source": "yfinance_daily_completed",
+            }
+        except Exception as e:
+            logger.error(f"Error fetching last completed daily close for {symbol}: {str(e)}")
+            return None
+
+    @staticmethod
+    def get_intraday_ohlc(ticker, interval="60m", period="5d"):
+        symbol = YFinanceHelper.normalize_symbol(ticker)
+        try:
             stock = yf.Ticker(symbol)
 
             hist = stock.history(period=period, interval=interval, auto_adjust=False, prepost=False)
-            # ambil data intraday, misalnya per 60 menit selama 5 hari
 
             if hist.empty:
                 logger.warning(f"No intraday OHLC data found for {symbol}")
                 return {"candles": [], "last_date": None, "last_updated": None}
 
             hist = hist.copy().dropna(subset=["Open", "High", "Low", "Close"])
-            # hapus data candle yg kosong
+            hist = YFinanceHelper._normalize_history_index_to_jakarta(hist)
 
-            if getattr(hist.index, "tz", None) is not None:
-                hist.index = hist.index.tz_convert(YFinanceHelper.JAKARTA_TZ).tz_localize(None)
-                # convert timezone ke jakarta
+            if hist.empty:
+                return {"candles": [], "last_date": None, "last_updated": None}
 
-            last_trading_date = hist.index[-1].date()  # ambil tanggal trading terakhir
+            last_trading_date = hist.index[-1].date()
             hist = hist[hist.index.date == last_trading_date]
-            # cuma ambil candle pada hari trading terakhir aja
 
             candles = []
             for idx, row in hist.iterrows():
                 candles.append({
-                    "t": idx.strftime("%Y-%m-%d %H:%M"),  # waktu candle
+                    "t": idx.strftime("%Y-%m-%d %H:%M"),
                     "open": float(row["Open"]),
                     "high": float(row["High"]),
                     "low": float(row["Low"]),
@@ -257,9 +264,9 @@ class YFinanceHelper:
                 })
 
             return {
-                "candles": candles,  # list candle
-                "last_date": last_trading_date.strftime("%Y-%m-%d") if candles else None,  # tanggal terakhir
-                "last_updated": hist.index[-1].strftime("%Y-%m-%d %H:%M") if candles else None,  # update terakhir
+                "candles": candles,
+                "last_date": last_trading_date.strftime("%Y-%m-%d") if candles else None,
+                "last_updated": hist.index[-1].strftime("%Y-%m-%d %H:%M") if candles else None,
             }
 
         except Exception as e:
@@ -268,9 +275,9 @@ class YFinanceHelper:
 
     @staticmethod
     def get_range_ohlc(ticker, timeframe="7D"):
+        symbol = YFinanceHelper.normalize_symbol(ticker)
         try:
             timeframe = (timeframe or "7D").upper()
-            symbol = YFinanceHelper.normalize_symbol(ticker)
             stock = yf.Ticker(symbol)
 
             config = {
@@ -284,16 +291,14 @@ class YFinanceHelper:
                 return {"candles": [], "last_date": None, "last_updated": None, "interval": config["interval"]}
 
             hist = hist.copy().dropna(subset=["Open", "High", "Low", "Close"])
+            hist = YFinanceHelper._normalize_history_index_to_jakarta(hist)
+
             if hist.empty:
                 return {"candles": [], "last_date": None, "last_updated": None, "interval": config["interval"]}
-
-            if getattr(hist.index, "tz", None) is not None:
-                hist.index = hist.index.tz_convert(YFinanceHelper.JAKARTA_TZ).tz_localize(None)
 
             hist = hist.tail(config["limit"])
             candles = []
             for idx, row in hist.iterrows():
-                idx = YFinanceHelper._to_jakarta_naive(idx)
                 candles.append({
                     "t": idx.strftime("%Y-%m-%d"),
                     "open": float(row["Open"]),
@@ -302,7 +307,7 @@ class YFinanceHelper:
                     "close": float(row["Close"]),
                 })
 
-            last_dt = YFinanceHelper._to_jakarta_naive(hist.index[-1]) if len(hist.index) else None
+            last_dt = hist.index[-1] if len(hist.index) else None
             return {
                 "candles": candles,
                 "last_date": last_dt.strftime("%Y-%m-%d") if last_dt else None,
@@ -317,7 +322,7 @@ class YFinanceHelper:
     def get_market_overview():
         def _safe_pct(current, previous):
             if previous in (None, 0):
-                return None  # kalau data sebelumnya ga ada / 0, ga bisa hitung persen
+                return None
             try:
                 return ((float(current) - float(previous)) / float(previous)) * 100
             except Exception:
@@ -336,20 +341,18 @@ class YFinanceHelper:
                     return fallback_dt
 
                 intraday = intraday.dropna(subset=["Close"]).copy()
+                intraday = YFinanceHelper._normalize_history_index_to_jakarta(intraday)
+
                 if intraday.empty:
                     return fallback_dt
 
-                last_idx = intraday.index[-1]
-                last_dt = YFinanceHelper._to_jakarta_naive(last_idx)
-
-                return last_dt or fallback_dt
+                return intraday.index[-1] or fallback_dt
             except Exception:
                 return fallback_dt
 
         try:
-            now = datetime.now(YFinanceHelper.JAKARTA_TZ)  # waktu sekarang
+            now = datetime.now(YFinanceHelper.JAKARTA_TZ)
 
-            # daftar market yg mau diambil
             indexes = {
                 "ihsg": {"symbol": "^JKSE", "label": "IHSG", "suffix": ""},
                 "emas": {"symbol": "GC=F", "label": "Harga Emas", "suffix": "USD/oz"},
@@ -361,42 +364,43 @@ class YFinanceHelper:
                 ticker = yf.Ticker(cfg["symbol"])
 
                 hist = ticker.history(period="5d", interval="1d", auto_adjust=False)
-                # daily dipakai buat nilai close & persen perubahan
 
                 if hist.empty:
                     result[key] = None
                     continue
 
                 hist = hist.dropna(subset=["Close"]).copy()
+                hist = YFinanceHelper._normalize_history_index_to_jakarta(hist)
+
                 if hist.empty:
                     result[key] = None
                     continue
 
-                latest = hist.iloc[-1]  # data daily terbaru
-                previous = hist.iloc[-2] if len(hist) > 1 else None  # data sebelumnya
+                latest = hist.iloc[-1]
+                previous = hist.iloc[-2] if len(hist) > 1 else None
 
-                latest_daily_dt = YFinanceHelper._to_jakarta_naive(hist.index[-1])
+                latest_daily_dt = hist.index[-1]
                 latest_intraday_dt = _get_latest_intraday_dt(ticker, fallback_dt=latest_daily_dt)
 
-                current_value = float(latest["Close"])  # nilai terbaru
-                previous_value = float(previous["Close"]) if previous is not None else None  # nilai sebelumnya
-                change_pct = _safe_pct(current_value, previous_value)  # persen perubahan
+                current_value = float(latest["Close"])
+                previous_value = float(previous["Close"]) if previous is not None else None
+                change_pct = _safe_pct(current_value, previous_value)
 
                 effective_dt = latest_intraday_dt or latest_daily_dt
-                date_str = effective_dt.strftime("%Y-%m-%d") if effective_dt else None  # tanggal update terbaru
+                date_str = effective_dt.strftime("%Y-%m-%d") if effective_dt else None
 
                 result[key] = {
-                    "label": cfg["label"],  # nama label
-                    "value": current_value,  # nilai sekarang
-                    "changePercent": change_pct,  # persen perubahan
-                    "date": date_str,  # tanggal update terbaru
-                    "source": "yfinance",  # sumber
+                    "label": cfg["label"],
+                    "value": current_value,
+                    "changePercent": change_pct,
+                    "date": date_str,
+                    "source": "yfinance",
                     "updatedAt": YFinanceHelper._format_dt(effective_dt),
-                    "unit": cfg["suffix"],  # satuan
+                    "unit": cfg["suffix"],
                     "isProxy": False,
                 }
 
-            result["asOf"] = now.strftime("%Y-%m-%d %H:%M")  # waktu data diambil
+            result["asOf"] = now.strftime("%Y-%m-%d %H:%M")
             return result
 
         except Exception as e:
@@ -406,28 +410,27 @@ class YFinanceHelper:
     @staticmethod
     def search_stocks(query: str):
         try:
-            results = []  # list hasil pencarian
+            results = []
 
             query_with_jk = query.upper() if query.upper().endswith(".JK") else f"{query.upper()}.JK"
-            # kalau user belum nulis .JK, tambahin otomatis
 
             try:
                 stock = yf.Ticker(query_with_jk)
-                info = stock.info  # cek info saham
+                info = stock.info
 
                 if info.get("longName"):
                     results.append({
-                        "ticker": query_with_jk.replace(".JK", ""),  # ticker tanpa .JK
-                        "fullTicker": query_with_jk,  # ticker lengkap
-                        "name": info.get("longName", ""),  # nama perusahaan
-                        "sector": info.get("sector", ""),  # sektor
+                        "ticker": query_with_jk.replace(".JK", ""),
+                        "fullTicker": query_with_jk,
+                        "name": info.get("longName", ""),
+                        "sector": info.get("sector", ""),
                     })
-                    return results  # kalau ketemu langsung return
+                    return results
             except Exception:
-                pass  # kalau error di pencarian ini, lanjut return kosong
+                pass
 
             return results
 
         except Exception as e:
             logger.error(f"Error searching stocks: {str(e)}")
-            return [] 
+            return []
