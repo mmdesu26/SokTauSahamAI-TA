@@ -1,5 +1,6 @@
 from app import db, bcrypt
 
+
 class User(db.Model):
     __tablename__ = "users"
 
@@ -7,16 +8,15 @@ class User(db.Model):
     username = db.Column(db.String(50), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+
     created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp()
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
     )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp()
+        onupdate=db.func.current_timestamp(),
     )
 
     def set_password(self, password):
@@ -27,24 +27,42 @@ class User(db.Model):
 
     def __repr__(self):
         return f"<User {self.username}>"
-    
+
 
 class Glossary(db.Model):
     __tablename__ = "glossaries"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
     term = db.Column(db.String(150), unique=True, nullable=False)
     definition = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(100), nullable=True)
+
+    source_type = db.Column(
+        db.String(50), nullable=False, default="official_literature"
+    )
+    source_name = db.Column(db.String(255), nullable=False)
+    source_organization = db.Column(db.String(255), nullable=True)
+    source_year = db.Column(db.String(20), nullable=True)
+    source_url = db.Column(db.Text, nullable=True)
+    source_reference = db.Column(db.Text, nullable=True)
+
+    verification_status = db.Column(
+        db.String(30), nullable=False, default="literature_based"
+    )
+    verified_by = db.Column(db.String(150), nullable=True)
+    verifier_role = db.Column(db.String(150), nullable=True)
+    verified_at = db.Column(db.DateTime, nullable=True)
+    verification_notes = db.Column(db.Text, nullable=True)
+
     created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp()
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
     )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp()
+        onupdate=db.func.current_timestamp(),
     )
 
     def to_dict(self):
@@ -52,13 +70,25 @@ class Glossary(db.Model):
             "id": self.id,
             "term": self.term,
             "definition": self.definition,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "category": self.category,
+            "sourceType": self.source_type,
+            "sourceName": self.source_name,
+            "sourceOrganization": self.source_organization,
+            "sourceYear": self.source_year,
+            "sourceUrl": self.source_url,
+            "sourceReference": self.source_reference,
+            "verificationStatus": self.verification_status,
+            "verifiedBy": self.verified_by,
+            "verifierRole": self.verifier_role,
+            "verifiedAt": self.verified_at.isoformat() if self.verified_at else None,
+            "verificationNotes": self.verification_notes,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def __repr__(self):
         return f"<Glossary {self.term}>"
-    
+
 
 class Stock(db.Model):
     __tablename__ = "stocks"
@@ -70,16 +100,15 @@ class Stock(db.Model):
     price = db.Column(db.Numeric(15, 2), nullable=False, server_default="0")
     change_percent = db.Column(db.String(20), nullable=False, server_default="0.00%")
     status = db.Column(db.String(20), nullable=False, server_default="Active")
+
     created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp()
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
     )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp()
+        onupdate=db.func.current_timestamp(),
     )
 
     def to_dict(self):
@@ -91,20 +120,24 @@ class Stock(db.Model):
             "price": str(self.price) if self.price is not None else "0",
             "change": self.change_percent,
             "status": self.status,
-            "lastUpdated": self.updated_at.strftime("%Y-%m-%d %H:%M") if self.updated_at else None,
+            "lastUpdated": self.updated_at.strftime("%Y-%m-%d %H:%M")
+            if self.updated_at
+            else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def __repr__(self):
         return f"<Stock {self.ticker}>"
-    
+
+
 class StockProfile(db.Model):
     __tablename__ = "stock_profiles"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    stock_id = db.Column(db.Integer, db.ForeignKey("stocks.id"), nullable=False, unique=True)
-
+    stock_id = db.Column(
+        db.Integer, db.ForeignKey("stocks.id"), nullable=False, unique=True
+    )
     long_name = db.Column(db.String(200), nullable=False)
     short_name = db.Column(db.String(100), nullable=True)
     sector = db.Column(db.String(100), nullable=True)
@@ -115,15 +148,13 @@ class StockProfile(db.Model):
     country = db.Column(db.String(100), nullable=True)
 
     created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp()
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
     )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp()
+        onupdate=db.func.current_timestamp(),
     )
 
     stock = db.relationship("Stock", backref=db.backref("profile", uselist=False))
@@ -147,8 +178,9 @@ class StockFundamental(db.Model):
     __tablename__ = "stock_fundamentals"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    stock_id = db.Column(db.Integer, db.ForeignKey("stocks.id"), nullable=False, unique=True)
-
+    stock_id = db.Column(
+        db.Integer, db.ForeignKey("stocks.id"), nullable=False, unique=True
+    )
     eps_ttm = db.Column(db.Float, nullable=True)
     per_ttm = db.Column(db.Float, nullable=True)
     pbv = db.Column(db.Float, nullable=True)
@@ -157,22 +189,19 @@ class StockFundamental(db.Model):
     net_income = db.Column(db.BigInteger, nullable=True)
     total_assets = db.Column(db.BigInteger, nullable=True)
     total_equity = db.Column(db.BigInteger, nullable=True)
-
     benchmark_per = db.Column(db.Float, nullable=True)
     benchmark_pbv = db.Column(db.Float, nullable=True)
     benchmark_roe = db.Column(db.Float, nullable=True)
     benchmark_eps = db.Column(db.Float, nullable=True)
 
     created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp()
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
     )
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp()
+        onupdate=db.func.current_timestamp(),
     )
 
     stock = db.relationship("Stock", backref=db.backref("fundamental", uselist=False))
@@ -203,9 +232,8 @@ class StockPriceHistory(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     stock_id = db.Column(db.Integer, db.ForeignKey("stocks.id"), nullable=False)
-
-    timeframe = db.Column(db.String(10), nullable=False)  # 1D, 1W, 1M, 3M, 1Y, 1h
-    label = db.Column(db.String(50), nullable=False)      # 09:00, H1, 2026-03-01, dll
+    timeframe = db.Column(db.String(10), nullable=False)
+    label = db.Column(db.String(50), nullable=False)
     open_price = db.Column(db.Float, nullable=False)
     high_price = db.Column(db.Float, nullable=False)
     low_price = db.Column(db.Float, nullable=False)
@@ -213,9 +241,7 @@ class StockPriceHistory(db.Model):
     sort_order = db.Column(db.Integer, nullable=False, default=0)
 
     created_at = db.Column(
-        db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp()
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
     )
 
     stock = db.relationship("Stock", backref=db.backref("price_histories", lazy=True))
@@ -238,15 +264,17 @@ class SystemLog(db.Model):
     __tablename__ = "system_logs"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    timestamp = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
-    level = db.Column(db.String(20), nullable=False)  # 'success', 'warning', 'error', 'info'
-    source = db.Column(db.String(100), nullable=False)  # 'Stock Management', 'ML Prediction', 'Authentication', etc
+    timestamp = db.Column(
+        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
+    )
+    level = db.Column(db.String(20), nullable=False)
+    source = db.Column(db.String(100), nullable=False)
     message = db.Column(db.String(255), nullable=False)
-    details = db.Column(db.Text, nullable=True)  # Error details, stack trace, JSON data, etc
+    details = db.Column(db.Text, nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
-    action_type = db.Column(db.String(50), nullable=True)  # 'CREATE', 'UPDATE', 'DELETE', 'PREDICT', 'LOGIN', 'PASSWORD_CHANGE'
-    entity_type = db.Column(db.String(50), nullable=True)  # 'Stock', 'Glossary', 'User', 'Prediction'
-    entity_id = db.Column(db.Integer, nullable=True)  # ID of the entity affected
+    action_type = db.Column(db.String(50), nullable=True)
+    entity_type = db.Column(db.String(50), nullable=True)
+    entity_id = db.Column(db.Integer, nullable=True)
     ip_address = db.Column(db.String(50), nullable=True)
 
     user = db.relationship("User", backref=db.backref("logs", lazy=True))
@@ -254,7 +282,9 @@ class SystemLog(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
-            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S") if self.timestamp else None,
+            "timestamp": self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            if self.timestamp
+            else None,
             "level": self.level,
             "source": self.source,
             "message": self.message,
@@ -267,4 +297,4 @@ class SystemLog(db.Model):
         }
 
     def __repr__(self):
-        return f"<SystemLog {self.level} - {self.source}>"
+        return f"<SystemLog {self.id}>"

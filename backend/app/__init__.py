@@ -1,20 +1,20 @@
 from flask import Flask
-from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
+from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_sqlalchemy import SQLAlchemy
 
 from app.config import Config
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
-
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
+    storage_uri="memory://",
 )
+
 
 def create_app():
     app = Flask(__name__)
@@ -26,8 +26,12 @@ def create_app():
 
     CORS(
         app,
-        resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:3000"]}},
-        supports_credentials=False
+        resources={
+            r"/api/*": {
+                "origins": ["http://localhost:5173", "http://localhost:3000"]
+            }
+        },
+        supports_credentials=False,
     )
 
     from app.routes.auth_routes import auth_bp
@@ -41,7 +45,7 @@ def create_app():
     app.register_blueprint(investor_bp, url_prefix="/api/investor")
     app.register_blueprint(glossary_bp, url_prefix="/api")
     app.register_blueprint(stocks_bp, url_prefix="/api")
-    
+
     @app.route("/api/health")
     def health():
         try:

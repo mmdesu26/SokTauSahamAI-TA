@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { Search, BookOpen } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Search,
+  BookOpen,
+  BadgeCheck,
+  FileText,
+  Library,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 export default function InvestorGlossary() {
@@ -10,26 +16,62 @@ export default function InvestorGlossary() {
   const fetchGlossary = async () => {
     setIsLoading(true);
 
-    const { ok, data } = await apiFetch("/glossary");
+    try {
+      const { ok, data } = await apiFetch("/glossary");
 
-    if (ok && data.success) {
-      setGlossaryItems(data.data || []);
+      if (ok && data.success) {
+        setGlossaryItems(data.data || []);
+      }
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   useEffect(() => {
     fetchGlossary();
   }, []);
 
-  const filtered = glossaryItems.filter((item) => {
+  const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
+
+    return glossaryItems.filter((item) => {
+      if (!q) return true;
+
+      return (
+        item.term?.toLowerCase().includes(q) ||
+        item.definition?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q) ||
+        item.sourceName?.toLowerCase().includes(q)
+      );
+    });
+  }, [glossaryItems, searchQuery]);
+
+  const getStatusBadge = (status) => {
+    if (status === "verified") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
+          <BadgeCheck className="h-3.5 w-3.5" />
+          Terverifikasi
+        </span>
+      );
+    }
+
+    if (status === "reviewed") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300">
+          <FileText className="h-3.5 w-3.5" />
+          Sudah Ditinjau
+        </span>
+      );
+    }
+
     return (
-      item.term.toLowerCase().includes(q) ||
-      item.definition.toLowerCase().includes(q)
+      <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/15 px-3 py-1 text-xs font-semibold text-cyan-300">
+        <Library className="h-3.5 w-3.5" />
+        Literatur Resmi
+      </span>
     );
-  });
+  };
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 pb-16">
@@ -42,18 +84,19 @@ export default function InvestorGlossary() {
 
         <p className="max-w-3xl text-lg text-slate-300 md:text-xl">
           Pahami istilah-istilah penting dalam dunia investasi saham dan analisis
-          pasar Indonesia
+          pasar Indonesia.
         </p>
       </div>
 
       <div className="relative mx-auto max-w-2xl">
-        <Search className="pointer-events-none absolute top-1/2 left-5 h-6 w-6 -translate-y-1/2 text-slate-500" />
+        <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-500" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari istilah, singkatan, atau definisi..."
-          className="w-full rounded-lg border border-slate-800 bg-slate-900/50 py-3 pl-15 pr-4 text-white placeholder-slate-500 transition focus:border-[#4988C4]/60 focus:outline-none"        />
+          placeholder="Cari istilah, kategori, sumber, atau definisi..."
+          className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 pl-14 pr-4 text-white placeholder-slate-500 transition focus:border-[#4988C4]/60 focus:outline-none"
+        />
       </div>
 
       {isLoading ? (
@@ -67,10 +110,47 @@ export default function InvestorGlossary() {
               key={item.id}
               className="group rounded-3xl border border-slate-800 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-900/20"
             >
-              <h3 className="mb-4 text-xl font-semibold text-cyan-400 transition-colors group-hover:text-cyan-300">
-                {item.term}
-              </h3>
-              <p className="leading-relaxed text-slate-300">{item.definition}</p>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <h3 className="text-xl font-semibold text-cyan-400 transition-colors group-hover:text-cyan-300">
+                  {item.term}
+                </h3>
+
+                {getStatusBadge(item.verificationStatus)}
+              </div>
+
+              {item.category && (
+                <div className="mb-4">
+                  <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-300">
+                    {item.category}
+                  </span>
+                </div>
+              )}
+
+              <p className="mb-5 leading-relaxed text-slate-300">
+                {item.definition}
+              </p>
+
+              <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
+                <p>
+                  <span className="font-semibold text-slate-200">Sumber:</span>{" "}
+                  {item.sourceName || "-"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-200">Organisasi:</span>{" "}
+                  {item.sourceOrganization || "-"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-200">Tahun:</span>{" "}
+                  {item.sourceYear || "-"}
+                </p>
+                {item.verifiedBy && (
+                  <p>
+                    <span className="font-semibold text-slate-200">Validator:</span>{" "}
+                    {item.verifiedBy}
+                    {item.verifierRole ? ` (${item.verifierRole})` : ""}
+                  </p>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -80,7 +160,7 @@ export default function InvestorGlossary() {
             Tidak menemukan istilah yang sesuai dengan pencarian "{searchQuery}"
           </p>
           <p className="mt-2 text-slate-500">
-            Coba gunakan kata kunci lain atau hapus filter pencarian
+            Coba gunakan kata kunci lain atau hapus filter pencarian.
           </p>
         </div>
       )}

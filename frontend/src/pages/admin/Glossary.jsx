@@ -9,16 +9,43 @@ import {
   Save,
   Info,
   AlertCircle,
+  BadgeCheck,
+  FileText,
 } from "lucide-react";
 
 import { apiFetch } from "@/lib/api";
 import { useAppAlert } from "@/components/AppAlertContext";
 
+const INITIAL_FORM = {
+  term: "",
+  definition: "",
+  category: "",
+  source_type: "official_literature",
+  source_name: "Literatur Resmi Pasar Modal Indonesia",
+  source_organization: "OJK / BEI",
+  source_year: "2026",
+  source_url: "",
+  source_reference: "Disusun dari literatur resmi pasar modal Indonesia.",
+  verification_status: "literature_based",
+  verified_by: "",
+  verifier_role: "",
+  verification_notes: "",
+};
+
+const STATUS_OPTIONS = [
+  { value: "literature_based", label: "Berbasis Literatur Resmi" },
+  { value: "reviewed", label: "Sudah Ditinjau" },
+  { value: "verified", label: "Terverifikasi" },
+];
+
 export default function AdminGlossary() {
   const { showSuccess, showError } = useAppAlert();
 
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -27,21 +54,28 @@ export default function AdminGlossary() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const [formData, setFormData] = useState({
-    term: "",
-    definition: "",
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM);
 
   const filteredItems = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return items;
 
-    return items.filter(
-      (item) =>
-        item.term.toLowerCase().includes(q) ||
-        item.definition.toLowerCase().includes(q)
-    );
-  }, [items, searchQuery]);
+    return items.filter((item) => {
+      const matchSearch =
+        !q ||
+        item.term?.toLowerCase().includes(q) ||
+        item.definition?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q) ||
+        item.sourceName?.toLowerCase().includes(q) ||
+        item.sourceOrganization?.toLowerCase().includes(q);
+
+      const matchStatus =
+        !statusFilter || item.verificationStatus === statusFilter;
+
+      const matchCategory = !categoryFilter || item.category === categoryFilter;
+
+      return matchSearch && matchStatus && matchCategory;
+    });
+  }, [items, searchQuery, statusFilter, categoryFilter]);
 
   const fetchGlossary = async () => {
     setIsLoading(true);
@@ -52,7 +86,7 @@ export default function AdminGlossary() {
       if (ok && data.success) {
         setItems(data.data || []);
       } else {
-        showError(data.message || "Gagal mengambil data glosarium.", "Gagal");
+        showError(data?.message || "Gagal mengambil data glosarium.", "Gagal");
       }
     } catch {
       showError("Terjadi kesalahan saat mengambil data glosarium.", "Gagal");
@@ -61,15 +95,24 @@ export default function AdminGlossary() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const { ok, data } = await apiFetch("/glossary/categories");
+      if (ok && data.success) {
+        setCategories(data.data || []);
+      }
+    } catch {
+      // sengaja diamkan agar UI tetap jalan
+    }
+  };
+
   useEffect(() => {
     fetchGlossary();
+    fetchCategories();
   }, []);
 
   const resetForm = () => {
-    setFormData({
-      term: "",
-      definition: "",
-    });
+    setFormData(INITIAL_FORM);
     setEditingId(null);
   };
 
@@ -80,8 +123,19 @@ export default function AdminGlossary() {
 
   const openEditModal = (item) => {
     setFormData({
-      term: item.term,
-      definition: item.definition,
+      term: item.term || "",
+      definition: item.definition || "",
+      category: item.category || "",
+      source_type: item.sourceType || "official_literature",
+      source_name: item.sourceName || "",
+      source_organization: item.sourceOrganization || "",
+      source_year: item.sourceYear || "",
+      source_url: item.sourceUrl || "",
+      source_reference: item.sourceReference || "",
+      verification_status: item.verificationStatus || "literature_based",
+      verified_by: item.verifiedBy || "",
+      verifier_role: item.verifierRole || "",
+      verification_notes: item.verificationNotes || "",
     });
     setEditingId(item.id);
     setIsModalOpen(true);
@@ -104,7 +158,17 @@ export default function AdminGlossary() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+
+      if (name === "verification_status" && value !== "verified") {
+        next.verified_by = "";
+        next.verifier_role = "";
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -113,10 +177,41 @@ export default function AdminGlossary() {
     const payload = {
       term: formData.term.trim(),
       definition: formData.definition.trim(),
+      category: formData.category.trim(),
+      source_type: formData.source_type.trim(),
+      source_name: formData.source_name.trim(),
+      source_organization: formData.source_organization.trim(),
+      source_year: formData.source_year.trim(),
+      source_url: formData.source_url.trim(),
+      source_reference: formData.source_reference.trim(),
+      verification_status: formData.verification_status.trim(),
+      verified_by:
+        formData.verification_status === "verified"
+          ? formData.verified_by.trim()
+          : "",
+      verifier_role:
+        formData.verification_status === "verified"
+          ? formData.verifier_role.trim()
+          : "",
+      verification_notes: formData.verification_notes.trim(),
     };
 
-    if (!payload.term || !payload.definition) {
-      showError("Istilah dan definisi wajib diisi.", "Gagal");
+    if (!payload.term || !payload.definition || !payload.source_name) {
+      showError(
+        "Istilah, definisi, dan nama sumber wajib diisi.",
+        "Validasi Gagal"
+      );
+      return;
+    }
+
+    if (
+      payload.verification_status === "verified" &&
+      (!payload.verified_by || !payload.verifier_role)
+    ) {
+      showError(
+        "Jika status terverifikasi, nama validator dan perannya wajib diisi.",
+        "Validasi Gagal"
+      );
       return;
     }
 
@@ -144,8 +239,9 @@ export default function AdminGlossary() {
         );
         closeModal();
         fetchGlossary();
+        fetchCategories();
       } else {
-        showError(data.message || "Gagal menyimpan data glosarium.", "Gagal");
+        showError(data?.message || "Gagal menyimpan data glosarium.", "Gagal");
       }
     } catch {
       showError("Terjadi kesalahan saat menyimpan data glosarium.", "Gagal");
@@ -166,8 +262,9 @@ export default function AdminGlossary() {
           "Berhasil"
         );
         fetchGlossary();
+        fetchCategories();
       } else {
-        showError(data.message || "Gagal menghapus data glosarium.", "Gagal");
+        showError(data?.message || "Gagal menghapus data glosarium.", "Gagal");
       }
     } catch {
       showError("Terjadi kesalahan saat menghapus data glosarium.", "Gagal");
@@ -176,41 +273,94 @@ export default function AdminGlossary() {
     }
   };
 
+  const getStatusBadge = (status) => {
+    if (status === "verified") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+          <BadgeCheck className="h-3.5 w-3.5" />
+          Terverifikasi
+        </span>
+      );
+    }
+
+    if (status === "reviewed") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+          <FileText className="h-3.5 w-3.5" />
+          Sudah Ditinjau
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+        <BookOpen className="h-3.5 w-3.5" />
+        Literatur Resmi
+      </span>
+    );
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
       <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
-      <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
-        Manajemen Data Glosarium
-      </h1>
+        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
+          Manajemen Data Glosarium
+        </h1>
 
-      <p className="max-w-3xl text-lg text-[#666666] md:text-xl text-justify">
-        Kelola data master glosarium dengan Create, Read, Update, dan Delete
-        untuk mengisi istilah-istilah saham yang ditampilkan pada halaman user.
-      </p>
-    </section>
+        <p className="max-w-4xl text-lg text-[#666666] md:text-xl text-justify">
+          Kelola istilah-istilah saham, sumber referensi, dan status validasi
+          glosarium yang akan ditampilkan pada halaman investor.
+        </p>
+      </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="relative mx-auto min-w-[260px] max-w-md flex-1">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari istilah, singkatan, atau definisi..."
-            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-4 pl-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-          />
-        </div>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="grid flex-1 gap-3 md:grid-cols-3">
+          <div className="relative md:col-span-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari istilah atau definisi..."
+              className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-4 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+            />
+          </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={openAddModal}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white shadow-sm transition hover:bg-[var(--color-admin2)] hover:text-[#222222]"
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
           >
-            <Plus size={18} />
-            Tambah Istilah
-          </button>
+            <option value="">Semua Kategori</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+          >
+            <option value="">Semua Status</option>
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <button
+          type="button"
+          onClick={openAddModal}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white shadow-sm transition hover:bg-[var(--color-admin2)] hover:text-[#222222]"
+        >
+          <Plus size={18} />
+          Tambah Istilah
+        </button>
       </div>
 
       <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
@@ -225,7 +375,7 @@ export default function AdminGlossary() {
                 Daftar Istilah Glosarium
               </h2>
               <p className="text-sm text-gray-600">
-                Edit atau hapus istilah yang akan tampil di halaman user.
+                Edit, lengkapi metadata sumber, ubah status, atau hapus istilah.
               </p>
             </div>
           </div>
@@ -246,9 +396,20 @@ export default function AdminGlossary() {
                 className="rounded-2xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-5"
               >
                 <div className="mb-4 flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-bold leading-snug text-gray-800">
-                    {item.term}
-                  </h3>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold leading-snug text-gray-800">
+                      {item.term}
+                    </h3>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {getStatusBadge(item.verificationStatus)}
+                      {item.category && (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 border border-[var(--color-admin4)]">
+                          {item.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
                   <div className="flex shrink-0 items-center gap-2">
                     <button
@@ -271,9 +432,30 @@ export default function AdminGlossary() {
                   </div>
                 </div>
 
-                <p className="leading-relaxed text-gray-600">
+                <p className="mb-4 leading-relaxed text-gray-600">
                   {item.definition}
                 </p>
+
+                <div className="space-y-2 rounded-xl bg-white/80 p-4 text-sm text-gray-600 border border-[var(--color-admin4)]">
+                  <p>
+                    <span className="font-semibold text-gray-800">Sumber:</span>{" "}
+                    {item.sourceName || "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-gray-800">Organisasi:</span>{" "}
+                    {item.sourceOrganization || "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-gray-800">Tahun:</span>{" "}
+                    {item.sourceYear || "-"}
+                  </p>
+                  {item.verifiedBy && (
+                    <p>
+                      <span className="font-semibold text-gray-800">Validator:</span>{" "}
+                      {item.verifiedBy} {item.verifierRole ? `(${item.verifierRole})` : ""}
+                    </p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -283,7 +465,7 @@ export default function AdminGlossary() {
               Data tidak ditemukan
             </p>
             <p className="mt-2 text-gray-500">
-              Tidak ada istilah yang cocok dengan pencarian "{searchQuery}".
+              Tidak ada istilah yang cocok dengan filter yang dipilih.
             </p>
           </div>
         )}
@@ -291,7 +473,7 @@ export default function AdminGlossary() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-2xl">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
@@ -302,7 +484,7 @@ export default function AdminGlossary() {
                     {editingId ? "Edit Istilah" : "Tambah Istilah Baru"}
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Isi data istilah glosarium yang akan ditampilkan ke user.
+                    Lengkapi istilah, sumber, dan status verifikasi glosarium.
                   </p>
                 </div>
               </div>
@@ -316,33 +498,197 @@ export default function AdminGlossary() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Istilah
-                </label>
-                <input
-                  type="text"
-                  name="term"
-                  value={formData.term}
-                  onChange={handleChange}
-                  placeholder="Contoh: PER (Price-to-Earnings Ratio)"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Istilah
+                  </label>
+                  <input
+                    type="text"
+                    name="term"
+                    value={formData.term}
+                    onChange={handleChange}
+                    placeholder="Contoh: PER"
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Definisi
-                </label>
-                <textarea
-                  name="definition"
-                  value={formData.definition}
-                  onChange={handleChange}
-                  rows={5}
-                  placeholder="Masukkan penjelasan istilah..."
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                />
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Definisi
+                  </label>
+                  <textarea
+                    name="definition"
+                    value={formData.definition}
+                    onChange={handleChange}
+                    rows={5}
+                    placeholder="Masukkan definisi istilah..."
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Kategori
+                  </label>
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    placeholder="Contoh: Analisis Fundamental"
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Status Verifikasi
+                  </label>
+                  <select
+                    name="verification_status"
+                    value={formData.verification_status}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Tipe Sumber
+                  </label>
+                  <input
+                    type="text"
+                    name="source_type"
+                    value={formData.source_type}
+                    onChange={handleChange}
+                    placeholder="official_literature"
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Nama Sumber
+                  </label>
+                  <input
+                    type="text"
+                    name="source_name"
+                    value={formData.source_name}
+                    onChange={handleChange}
+                    placeholder="Contoh: Buku Saku Pasar Modal"
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Organisasi Sumber
+                  </label>
+                  <input
+                    type="text"
+                    name="source_organization"
+                    value={formData.source_organization}
+                    onChange={handleChange}
+                    placeholder="Contoh: OJK / BEI"
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Tahun Sumber
+                  </label>
+                  <input
+                    type="text"
+                    name="source_year"
+                    value={formData.source_year}
+                    onChange={handleChange}
+                    placeholder="Contoh: 2026"
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    URL Sumber
+                  </label>
+                  <input
+                    type="text"
+                    name="source_url"
+                    value={formData.source_url}
+                    onChange={handleChange}
+                    placeholder="https://..."
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Referensi / Catatan Sumber
+                  </label>
+                  <textarea
+                    name="source_reference"
+                    value={formData.source_reference}
+                    onChange={handleChange}
+                    rows={3}
+                    placeholder="Contoh: Parafrase dari literatur resmi OJK."
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
+
+                {formData.verification_status === "verified" && (
+                  <>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Nama Validator
+                      </label>
+                      <input
+                        type="text"
+                        name="verified_by"
+                        value={formData.verified_by}
+                        onChange={handleChange}
+                        placeholder="Contoh: Dr. Nama Dosen"
+                        className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Peran Validator
+                      </label>
+                      <input
+                        type="text"
+                        name="verifier_role"
+                        value={formData.verifier_role}
+                        onChange={handleChange}
+                        placeholder="Contoh: Dosen Pasar Modal"
+                        className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="md:col-span-2">
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Catatan Verifikasi
+                  </label>
+                  <textarea
+                    name="verification_notes"
+                    value={formData.verification_notes}
+                    onChange={handleChange}
+                    rows={3}
+                    placeholder="Catatan tambahan review atau validasi..."
+                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                  />
+                </div>
               </div>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
