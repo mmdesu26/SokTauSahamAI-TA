@@ -1,251 +1,420 @@
-# Gambaran Sistem SokTauSahamAI
+# NOTE FULLSTACK - SOKTAU SAHAM AI
 
-SokTauSahamAI adalah web app analisis saham yang combine data market dari yfinance + machine learning sederhana.
+## overview dikit biar ga lupa
 
-Fungsinya bukan cuma nampilin data saham, tapi juga kasih:
-- prediksi harga closing **besok (next trading day)**
-- insight fundamental untuk **3 bulan ke depan**
+ini project fullstack:
 
----
+* backend → flask (API + logic + model handling)
+* frontend → react (UI + interaksi user)
 
-## 1. Arsitektur Sistem
+tujuan:
+→ bantu user prediksi harga saham (bukan buat jadi cenayang 😅, tapi decision support aja)
 
-Sistem dibagi jadi 3 layer utama:
-- Backend (Python / API / ML logic)
-- Frontend (React UI)
-- Database (nyimpen ticker & log)
+flow besar:
+user → frontend → API backend → proses (model + data) → balik → ditampilin
 
 ---
 
-## 2. Alur Sistem
+## gambaran flow real (end to end)
 
-### Alur Admin
-1. Admin login
-2. Admin add ticker saham
-3. Backend validasi ticker ke yfinance
-4. Data basic disimpan ke database
-5. Aktivitas dicatat ke system log
+1. user login
+2. user pilih saham / trigger prediksi
+3. frontend hit endpoint:
 
----
+   ```
+   /api/investor/...
+   ```
+4. backend:
 
-### Alur User
-1. User buka halaman detail saham
-2. Sistem fetch:
-   - profil perusahaan
-   - candlestick
-3. User bisa buka:
-   - tab deskripsi
-   - tab fundamental
-4. User klik tombol **Prediksi**
-5. Backend jalanin model ML (on demand)
-6. Hasil dikirim ke frontend dan ditampilkan
+   * ambil data saham (historical)
+   * ambil close terakhir
+   * masukin ke model
+   * generate prediksi
+5. hasil dikirim ke frontend
+6. frontend render + kasih penjelasan
 
 ---
 
-## 3. Sumber Data
+## 🔥 CORE LOGIC PALING PENTING (JANGAN SAMPE LUPA)
 
-Semua data diambil dari **yfinance**:
-- harga historis (daily)
-- harga intraday (candlestick)
-- profil perusahaan
-- fundamental:
-  - EPS
-  - ROE
-  - PBV
-  - PER
+### model itu ga ngerti waktu
 
----
+model cuma tau:
+→ input terakhir yg dikasih
 
-## 4. Machine Learning (Model Harga)
-
-### Tujuan
-Prediksi:
-- **harga closing 1 hari ke depan (next trading day)**
+jadi:
+✅ kalo input valid → hasil lebih make sense
+❌ kalo input ngawur → hasil ikut ngawur
 
 ---
 
-### Cara Kerja Model
+## ⚠️ MASALAH UTAMA: DATA CLOSE
 
-Model tidak langsung prediksi harga, tapi:
+close price itu:
+→ cuma valid setelah market tutup
 
-1. model belajar return (persentase perubahan harga)
-2. hasil return dikonversi lagi ke harga
+jadi:
 
----
+### kondisi:
 
-### Data yang dipakai
-- closing price historis
-- lag data (close 1–10 hari sebelumnya)
-
-Tidak pakai:
-- indikator teknikal (RSI, MACD, dll)
-- fundamental
+* pagi / siang → market masih jalan ❌
+* sore (setelah tutup) → baru valid ✅
 
 ---
 
-### Model yang digunakan
-- Random Forest
-- Linear Regression
+### contoh real biar nempel
+
+senin:
+
+* jam 11 → harga masih berubah ❌
+* jam 16.00 → close fix ✅
+
+malam:
+→ baru boleh dipake buat prediksi selasa
 
 ---
 
-### Cara gabung (ensemble)
+## 💥 konsekuensi kalo salah
 
-Tidak fixed lagi.
+kalo backend ambil:
 
-Sekarang:
-- bobot dihitung dari performa (RMSE)
-- model lebih akurat → bobot lebih besar
+* data intraday / belum close
 
----
+maka:
 
-### Output Model Harga
+* model dapet data setengah matang
+* prediksi bias / ga akurat
 
-Yang dihasilkan:
-- prediksi closing besok
-- hasil RF
-- hasil LR
-- bobot masing-masing model
-- expected change (%)
-- rekomendasi harga (BUY / HOLD / SELL)
+ujungnya:
+user:
+"wah modelnya jelek"
+padahal datanya yg salah 😅
 
 ---
 
-## 5. Evaluasi Model
+## 🔧 TANGGUNG JAWAB BACKEND
 
-Model dievaluasi pakai data historis
+backend itu bukan cuma API
 
-### Metode
-- time-series split (bukan random)
-  - data lama → training
-  - data terbaru → testing
+tapi:
 
----
-
-### Metrik
-- RMSE → selisih rata-rata dalam rupiah
-- MAPE → selisih rata-rata dalam persen
+* filter data
+* validasi data
+* pastiin yg dikirim ke model itu final
 
 ---
 
-### Catatan
-- RMSE dihitung dari selisih harga prediksi vs harga asli
-- bukan dari 1 prediksi, tapi dari seluruh data test
+### backend stack
+
+* flask
+* sqlalchemy
+* bcrypt
+* limiter
+* cors
 
 ---
 
-## 6. Model Fundamental (Terpisah)
+### struktur penting
 
-Model fundamental tidak dipakai untuk prediksi harga harian
+app/
 
-Dipakai untuk:
-- estimasi return 3 bulan
-- arah (naik / turun)
-- rekomendasi
-
----
-
-### Input
-- EPS
-- ROE
-- PBV
-- PER
+* routes → endpoint
+* models → db
+* config → config
+* **init** → init app
 
 ---
 
-### Cara kerja
-- rule-based scoring (bukan ML training)
-- tiap rasio dikasih skor
-- total skor → jadi estimasi return %
+### route grouping
+
+```
+/api/auth
+/api/admin
+/api/investor
+```
+
+biar ga berantakan
 
 ---
 
-### Output
-- return 3 bulan (%)
-- arah (Naik / Turun)
-- rekomendasi (BUY / HOLD / SELL)
+### auth
+
+* register → hash password (bcrypt)
+* login → compare hash
+
+ingat:
+
+* jangan pernah simpen plain password
+* hati2 double hashing
 
 ---
 
-## 7. Candlestick
+### CORS
 
-Grafik candlestick:
-- pakai data intraday dari yfinance
-- hanya untuk visualisasi
-- bukan input ke model
+allow:
 
----
+* localhost:5173
+* localhost:3000
 
-## 8. Perbedaan Harga (Penting)
+kena di:
 
-Ada 2 jenis harga:
+```
+/api/*
+```
 
-### Close data model
-- harga penutupan harian terakhir yang sudah completed
-- dipakai model sebagai acuan
-
-### Harga chart
-- dari candlestick (intraday)
-- bisa beda karena lebih update
+kalo FE beda origin → langsung ditolak
 
 ---
 
-## 9. Prediksi On-Demand
+### limiter
 
-Prediksi:
-- tidak disimpan di database
-- dihitung saat user klik tombol
+```
+200/day
+50/hour
+```
 
-Tujuannya:
-- selalu pakai data terbaru
-- tidak stale
+buat:
 
----
+* anti spam
+* anti brute force
 
-## 10. API Utama
-
-Endpoint utama:
-
-- GET /api/stocks
-- GET /api/stocks/{ticker}/detail
-- GET /api/stocks/{ticker}/candlestick
-- GET /api/stocks/{ticker}/prediction
-- GET /api/stocks/{ticker}/fundamentals
-
-Admin:
-- POST /api/admin/stocks
-- PUT /api/admin/stocks/{id}
-- DELETE /api/admin/stocks/{id}
-- GET /api/admin/logs
+kadang ganggu pas testing → wajar 😅
 
 ---
 
-## 11. System Log
+### database (sqlalchemy)
 
-System log nyimpen:
-- login
-- tambah saham
-- update
-- delete
-- prediksi
-- error
+flow:
+model → query → response
+
+catatan:
+
+* jangan semua logic di route
+* nanti susah debug
+
+ideal:
+route → service → model
+(tapi sekarang masih oke campur dikit)
 
 ---
 
-## 12. Kesimpulan
+## ⚠️ LOGIC PREDIKSI DI BACKEND
 
-SokTauSahamAI adalah web app analisis saham yang combine:
+yang harus dipastiin:
 
-- data market dari yfinance
-- model harga (RF + LR)
-- model fundamental (rule-based)
-- candlestick visualization
+* ambil data close terakhir yg:
+  → sudah final
+  → bukan data berjalan
 
-Fokus utama:
-- prediksi harga **besok**
-- insight arah **3 bulan ke depan**
+---
 
-Model dibuat simple, explainable, dan tidak pakai indikator teknikal kompleks.
+### pseudo mindset
 
+"ambil last known valid close"
 
-Sistem tahu harga terakhir itu sudah completed karena dia cuma ambil data sebelum hari ini. Jadi selama hari ini masih berjalan atau bahkan sudah tutup, sistem tetap pakai hari sebelumnya untuk memastikan datanya benar-benar final dan tidak berubah lagi.
+bukan:
+"ambil harga terbaru yg ada sekarang"
+
+---
+
+## 🎯 TANGGUNG JAWAB FRONTEND
+
+frontend bukan cuma tampilan
+
+tapi:
+
+* nerjemahin data
+* ngejaga user ga salah ngerti
+
+---
+
+### frontend stack
+
+* react
+* fetch / axios
+
+---
+
+### flow FE
+
+user klik →
+fetch API →
+dapet response →
+render
+
+---
+
+### ⚠️ masalah klasik frontend
+
+1. data undefined
+2. key mismatch
+3. response beda format
+
+contoh fatal:
+
+```js
+data.price
+```
+
+padahal:
+
+```js
+data.data.price
+```
+
+langsung crash 💀
+
+---
+
+### best practice FE
+
+* optional chaining:
+
+```js
+data?.price
+```
+
+* kasih loading state
+* kasih error state
+* jangan assume data selalu ada
+
+---
+
+## ⚠️ BAGIAN KRUSIAL DI FRONTEND: EDUKASI USER
+
+ini yg sering diremehin tapi penting banget
+
+user ga ngerti:
+
+* close price
+* market time
+* data valid vs belum
+
+---
+
+### masalah real user
+
+user bisa:
+
+* prediksi pagi
+* prediksi siang
+* prediksi kapan aja
+
+padahal:
+datanya belum final
+
+---
+
+### solusi (WAJIB ADA DI UI)
+
+kasih info yg jelas
+
+❌ jangan cuma:
+"prediksi sebelum market buka"
+
+itu ambigu
+
+---
+
+### ✅ pakai ini:
+
+"Prediksi sebaiknya dilakukan setelah market tutup di hari yang sama agar model menggunakan harga penutupan (close) terbaru, bukan data hari sebelumnya."
+
+---
+
+### tujuan
+
+biar user:
+
+* ga salah timing
+* ga nyalahin model
+
+---
+
+## 🔄 RELASI BACKEND vs FRONTEND
+
+backend:
+→ jaga data valid
+
+frontend:
+→ jaga user paham
+
+kalo salah satu gagal:
+→ sistem tetep gagal
+
+---
+
+## 🧨 BUG YG SERING BANGET
+
+### backend aman, frontend merah
+
+* format response beda
+* null value
+
+---
+
+### login gagal terus
+
+* hash mismatch
+
+---
+
+### data kosong
+
+* query ga match
+
+---
+
+### cors error
+
+* origin belum whitelist
+
+---
+
+### loading muter terus
+
+* lupa set false
+
+---
+
+## 🧠 MINDSET YG HARUS DIPEGANG
+
+ini bukan sekadar:
+"app prediksi saham"
+
+tapi:
+→ decision support tool
+
+---
+
+## ⚡ future improvement (kalo ga males 😅)
+
+backend:
+
+* JWT auth
+* service layer
+* better logging
+* validasi input
+
+frontend:
+
+* better state management
+* error boundary
+* UX edukasi lebih kuat
+
+---
+
+## 🔚 INTINYA
+
+kalau diringkas:
+
+* model itu bodoh → cuma makan data
+* backend → jaga kualitas data
+* frontend → jaga pemahaman user
+
+kalau:
+data salah ❌
+→ model salah ❌
+→ user makin sotoy 📉
+
+---
