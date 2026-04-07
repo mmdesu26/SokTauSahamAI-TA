@@ -10,7 +10,7 @@ import {
   Info,
   AlertCircle,
   BadgeCheck,
-  FileText,
+  Library,
 } from "lucide-react";
 
 import { apiFetch } from "@/lib/api";
@@ -19,22 +19,13 @@ import { useAppAlert } from "@/components/AppAlertContext";
 const INITIAL_FORM = {
   term: "",
   definition: "",
-  category: "",
-  source_type: "official_literature",
-  source_name: "Literatur Resmi Pasar Modal Indonesia",
-  source_organization: "OJK / BEI",
-  source_year: "2026",
   source_url: "",
-  source_reference: "Disusun dari literatur resmi pasar modal Indonesia.",
   verification_status: "literature_based",
   verified_by: "",
-  verifier_role: "",
-  verification_notes: "",
 };
 
 const STATUS_OPTIONS = [
   { value: "literature_based", label: "Berbasis Literatur Resmi" },
-  { value: "reviewed", label: "Sudah Ditinjau" },
   { value: "verified", label: "Terverifikasi" },
 ];
 
@@ -42,10 +33,8 @@ export default function AdminGlossary() {
   const { showSuccess, showError } = useAppAlert();
 
   const [items, setItems] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,18 +53,14 @@ export default function AdminGlossary() {
         !q ||
         item.term?.toLowerCase().includes(q) ||
         item.definition?.toLowerCase().includes(q) ||
-        item.category?.toLowerCase().includes(q) ||
-        item.sourceName?.toLowerCase().includes(q) ||
-        item.sourceOrganization?.toLowerCase().includes(q);
+        item.verifiedBy?.toLowerCase().includes(q);
 
       const matchStatus =
         !statusFilter || item.verificationStatus === statusFilter;
 
-      const matchCategory = !categoryFilter || item.category === categoryFilter;
-
-      return matchSearch && matchStatus && matchCategory;
+      return matchSearch && matchStatus;
     });
-  }, [items, searchQuery, statusFilter, categoryFilter]);
+  }, [items, searchQuery, statusFilter]);
 
   const fetchGlossary = async () => {
     setIsLoading(true);
@@ -95,20 +80,8 @@ export default function AdminGlossary() {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const { ok, data } = await apiFetch("/glossary/categories");
-      if (ok && data.success) {
-        setCategories(data.data || []);
-      }
-    } catch {
-      // sengaja diamkan agar UI tetap jalan
-    }
-  };
-
   useEffect(() => {
     fetchGlossary();
-    fetchCategories();
   }, []);
 
   const resetForm = () => {
@@ -125,17 +98,9 @@ export default function AdminGlossary() {
     setFormData({
       term: item.term || "",
       definition: item.definition || "",
-      category: item.category || "",
-      source_type: item.sourceType || "official_literature",
-      source_name: item.sourceName || "",
-      source_organization: item.sourceOrganization || "",
-      source_year: item.sourceYear || "",
       source_url: item.sourceUrl || "",
-      source_reference: item.sourceReference || "",
       verification_status: item.verificationStatus || "literature_based",
       verified_by: item.verifiedBy || "",
-      verifier_role: item.verifierRole || "",
-      verification_notes: item.verificationNotes || "",
     });
     setEditingId(item.id);
     setIsModalOpen(true);
@@ -164,7 +129,6 @@ export default function AdminGlossary() {
 
       if (name === "verification_status" && value !== "verified") {
         next.verified_by = "";
-        next.verifier_role = "";
       }
 
       return next;
@@ -177,39 +141,25 @@ export default function AdminGlossary() {
     const payload = {
       term: formData.term.trim(),
       definition: formData.definition.trim(),
-      category: formData.category.trim(),
-      source_type: formData.source_type.trim(),
-      source_name: formData.source_name.trim(),
-      source_organization: formData.source_organization.trim(),
-      source_year: formData.source_year.trim(),
       source_url: formData.source_url.trim(),
-      source_reference: formData.source_reference.trim(),
       verification_status: formData.verification_status.trim(),
       verified_by:
         formData.verification_status === "verified"
           ? formData.verified_by.trim()
           : "",
-      verifier_role:
-        formData.verification_status === "verified"
-          ? formData.verifier_role.trim()
-          : "",
-      verification_notes: formData.verification_notes.trim(),
     };
 
-    if (!payload.term || !payload.definition || !payload.source_name) {
-      showError(
-        "Istilah, definisi, dan nama sumber wajib diisi.",
-        "Validasi Gagal"
-      );
+    if (!payload.term || !payload.definition) {
+      showError("Istilah dan definisi wajib diisi.", "Validasi Gagal");
       return;
     }
 
     if (
       payload.verification_status === "verified" &&
-      (!payload.verified_by || !payload.verifier_role)
+      !payload.verified_by
     ) {
       showError(
-        "Jika status terverifikasi, nama validator dan perannya wajib diisi.",
+        "Nama verifier wajib diisi jika status terverifikasi.",
         "Validasi Gagal"
       );
       return;
@@ -239,7 +189,6 @@ export default function AdminGlossary() {
         );
         closeModal();
         fetchGlossary();
-        fetchCategories();
       } else {
         showError(data?.message || "Gagal menyimpan data glosarium.", "Gagal");
       }
@@ -262,7 +211,6 @@ export default function AdminGlossary() {
           "Berhasil"
         );
         fetchGlossary();
-        fetchCategories();
       } else {
         showError(data?.message || "Gagal menghapus data glosarium.", "Gagal");
       }
@@ -283,18 +231,9 @@ export default function AdminGlossary() {
       );
     }
 
-    if (status === "reviewed") {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-          <FileText className="h-3.5 w-3.5" />
-          Sudah Ditinjau
-        </span>
-      );
-    }
-
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-        <BookOpen className="h-3.5 w-3.5" />
+        <Library className="h-3.5 w-3.5" />
         Literatur Resmi
       </span>
     );
@@ -308,14 +247,13 @@ export default function AdminGlossary() {
         </h1>
 
         <p className="max-w-4xl text-lg text-[#666666] md:text-xl text-justify">
-          Kelola istilah-istilah saham, sumber referensi, dan status validasi
-          glosarium yang akan ditampilkan pada halaman investor.
+          Kelola istilah saham, link sumber, dan status verifikasi glosarium.
         </p>
       </section>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="grid flex-1 gap-3 md:grid-cols-3">
-          <div className="relative md:col-span-1">
+        <div className="grid flex-1 gap-3 md:grid-cols-2">
+          <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
@@ -325,19 +263,6 @@ export default function AdminGlossary() {
               className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-4 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
             />
           </div>
-
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-          >
-            <option value="">Semua Kategori</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
 
           <select
             value={statusFilter}
@@ -375,7 +300,7 @@ export default function AdminGlossary() {
                 Daftar Istilah Glosarium
               </h2>
               <p className="text-sm text-gray-600">
-                Edit, lengkapi metadata sumber, ubah status, atau hapus istilah.
+                Edit link sumber, ubah status, atau hapus istilah.
               </p>
             </div>
           </div>
@@ -400,14 +325,8 @@ export default function AdminGlossary() {
                     <h3 className="text-lg font-bold leading-snug text-gray-800">
                       {item.term}
                     </h3>
-
                     <div className="flex flex-wrap items-center gap-2">
                       {getStatusBadge(item.verificationStatus)}
-                      {item.category && (
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 border border-[var(--color-admin4)]">
-                          {item.category}
-                        </span>
-                      )}
                     </div>
                   </div>
 
@@ -438,21 +357,25 @@ export default function AdminGlossary() {
 
                 <div className="space-y-2 rounded-xl bg-white/80 p-4 text-sm text-gray-600 border border-[var(--color-admin4)]">
                   <p>
-                    <span className="font-semibold text-gray-800">Sumber:</span>{" "}
-                    {item.sourceName || "-"}
+                    <span className="font-semibold text-gray-800">Link Sumber:</span>{" "}
+                    {item.sourceUrl ? (
+                      <a
+                        href={item.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[var(--color-admin)] underline break-all"
+                      >
+                        {item.sourceUrl}
+                      </a>
+                    ) : (
+                      "-"
+                    )}
                   </p>
-                  <p>
-                    <span className="font-semibold text-gray-800">Organisasi:</span>{" "}
-                    {item.sourceOrganization || "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-gray-800">Tahun:</span>{" "}
-                    {item.sourceYear || "-"}
-                  </p>
+
                   {item.verifiedBy && (
                     <p>
-                      <span className="font-semibold text-gray-800">Validator:</span>{" "}
-                      {item.verifiedBy} {item.verifierRole ? `(${item.verifierRole})` : ""}
+                      <span className="font-semibold text-gray-800">Terverifikasi oleh:</span>{" "}
+                      {item.verifiedBy}
                     </p>
                   )}
                 </div>
@@ -473,7 +396,7 @@ export default function AdminGlossary() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-2xl">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-2xl">
             <div className="mb-6 flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
@@ -484,7 +407,7 @@ export default function AdminGlossary() {
                     {editingId ? "Edit Istilah" : "Tambah Istilah Baru"}
                   </h2>
                   <p className="text-sm text-gray-600">
-                    Lengkapi istilah, sumber, dan status verifikasi glosarium.
+                    Isi istilah, definisi, link sumber, dan status verifikasi.
                   </p>
                 </div>
               </div>
@@ -528,16 +451,16 @@ export default function AdminGlossary() {
                   />
                 </div>
 
-                <div>
+                <div className="md:col-span-2">
                   <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Kategori
+                    Link Sumber
                   </label>
                   <input
                     type="text"
-                    name="category"
-                    value={formData.category}
+                    name="source_url"
+                    value={formData.source_url}
                     onChange={handleChange}
-                    placeholder="Contoh: Analisis Fundamental"
+                    placeholder="https://..."
                     className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                   />
                 </div>
@@ -560,135 +483,21 @@ export default function AdminGlossary() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Tipe Sumber
-                  </label>
-                  <input
-                    type="text"
-                    name="source_type"
-                    value={formData.source_type}
-                    onChange={handleChange}
-                    placeholder="official_literature"
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Nama Sumber
-                  </label>
-                  <input
-                    type="text"
-                    name="source_name"
-                    value={formData.source_name}
-                    onChange={handleChange}
-                    placeholder="Contoh: Buku Saku Pasar Modal"
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Organisasi Sumber
-                  </label>
-                  <input
-                    type="text"
-                    name="source_organization"
-                    value={formData.source_organization}
-                    onChange={handleChange}
-                    placeholder="Contoh: OJK / BEI"
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Tahun Sumber
-                  </label>
-                  <input
-                    type="text"
-                    name="source_year"
-                    value={formData.source_year}
-                    onChange={handleChange}
-                    placeholder="Contoh: 2026"
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    URL Sumber
-                  </label>
-                  <input
-                    type="text"
-                    name="source_url"
-                    value={formData.source_url}
-                    onChange={handleChange}
-                    placeholder="https://..."
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Referensi / Catatan Sumber
-                  </label>
-                  <textarea
-                    name="source_reference"
-                    value={formData.source_reference}
-                    onChange={handleChange}
-                    rows={3}
-                    placeholder="Contoh: Parafrase dari literatur resmi OJK."
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
                 {formData.verification_status === "verified" && (
-                  <>
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Nama Validator
-                      </label>
-                      <input
-                        type="text"
-                        name="verified_by"
-                        value={formData.verified_by}
-                        onChange={handleChange}
-                        placeholder="Contoh: Dr. Nama Dosen"
-                        className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Peran Validator
-                      </label>
-                      <input
-                        type="text"
-                        name="verifier_role"
-                        value={formData.verifier_role}
-                        onChange={handleChange}
-                        placeholder="Contoh: Dosen Pasar Modal"
-                        className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                      />
-                    </div>
-                  </>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Terverifikasi oleh
+                    </label>
+                    <input
+                      type="text"
+                      name="verified_by"
+                      value={formData.verified_by}
+                      onChange={handleChange}
+                      placeholder="Contoh: Dr. Nama Dosen"
+                      className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                    />
+                  </div>
                 )}
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Catatan Verifikasi
-                  </label>
-                  <textarea
-                    name="verification_notes"
-                    value={formData.verification_notes}
-                    onChange={handleChange}
-                    rows={3}
-                    placeholder="Catatan tambahan review atau validasi..."
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
               </div>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">

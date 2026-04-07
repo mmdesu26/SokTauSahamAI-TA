@@ -32,37 +32,25 @@ class User(db.Model):
 class Glossary(db.Model):
     __tablename__ = "glossaries"
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-
-    term = db.Column(db.String(150), unique=True, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    term = db.Column(db.String(255), nullable=False, unique=True)
     definition = db.Column(db.Text, nullable=False)
-    category = db.Column(db.String(100), nullable=True)
 
-    source_type = db.Column(
-        db.String(50), nullable=False, default="official_literature"
-    )
-    source_name = db.Column(db.String(255), nullable=False)
-    source_organization = db.Column(db.String(255), nullable=True)
-    source_year = db.Column(db.String(20), nullable=True)
     source_url = db.Column(db.Text, nullable=True)
-    source_reference = db.Column(db.Text, nullable=True)
 
     verification_status = db.Column(
-        db.String(30), nullable=False, default="literature_based"
+        db.String(30),
+        nullable=False,
+        default="literature_based"
     )
-    verified_by = db.Column(db.String(150), nullable=True)
-    verifier_role = db.Column(db.String(150), nullable=True)
-    verified_at = db.Column(db.DateTime, nullable=True)
-    verification_notes = db.Column(db.Text, nullable=True)
 
-    created_at = db.Column(
-        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
-    )
+    verified_by = db.Column(db.String(150), nullable=True)
+
+    created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(
         db.DateTime,
-        nullable=False,
-        server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp(),
+        default=db.func.now(),
+        onupdate=db.func.now()
     )
 
     def to_dict(self):
@@ -70,20 +58,9 @@ class Glossary(db.Model):
             "id": self.id,
             "term": self.term,
             "definition": self.definition,
-            "category": self.category,
-            "sourceType": self.source_type,
-            "sourceName": self.source_name,
-            "sourceOrganization": self.source_organization,
-            "sourceYear": self.source_year,
             "sourceUrl": self.source_url,
-            "sourceReference": self.source_reference,
             "verificationStatus": self.verification_status,
             "verifiedBy": self.verified_by,
-            "verifierRole": self.verifier_role,
-            "verifiedAt": self.verified_at.isoformat() if self.verified_at else None,
-            "verificationNotes": self.verification_notes,
-            "createdAt": self.created_at.isoformat() if self.created_at else None,
-            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def __repr__(self):
