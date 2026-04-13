@@ -11,6 +11,7 @@ import {
   AlertCircle,
   BadgeCheck,
   Library,
+  ExternalLink,
 } from "lucide-react";
 
 import { apiFetch } from "@/lib/api";
@@ -28,6 +29,17 @@ const STATUS_OPTIONS = [
   { value: "literature_based", label: "Berbasis Literatur Resmi" },
   { value: "verified", label: "Terverifikasi" },
 ];
+
+function truncateUrl(url, maxLength = 45) {
+  if (!url) return "-";
+  try {
+    const { hostname, pathname } = new URL(url);
+    const short = `${hostname}${pathname}`;
+    return short.length > maxLength ? short.slice(0, maxLength) + "…" : short;
+  } catch {
+    return url.length > maxLength ? url.slice(0, maxLength) + "…" : url;
+  }
+}
 
 export default function AdminGlossary() {
   const { showSuccess, showError } = useAppAlert();
@@ -201,9 +213,10 @@ export default function AdminGlossary() {
     if (!selectedItem) return;
 
     try {
-      const { ok, data } = await apiFetch(`/admin/glossary/${selectedItem.id}`, {
-        method: "DELETE",
-      });
+      const { ok, data } = await apiFetch(
+        `/admin/glossary/${selectedItem.id}`,
+        { method: "DELETE" }
+      );
 
       if (ok && data.success) {
         showSuccess(
@@ -224,7 +237,7 @@ export default function AdminGlossary() {
   const getStatusBadge = (status) => {
     if (status === "verified") {
       return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
           <BadgeCheck className="h-3.5 w-3.5" />
           Terverifikasi
         </span>
@@ -232,7 +245,7 @@ export default function AdminGlossary() {
     }
 
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
         <Library className="h-3.5 w-3.5" />
         Literatur Resmi
       </span>
@@ -241,18 +254,20 @@ export default function AdminGlossary() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
+      {/* Header */}
       <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
+        <h1 className="mb-3 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
           Manajemen Data Glosarium
         </h1>
-
-        <p className="max-w-4xl text-lg text-[#666666] md:text-xl text-justify">
+        <p className="max-w-4xl text-lg text-[#666666]">
           Kelola istilah saham, link sumber, dan status verifikasi glosarium.
         </p>
       </section>
 
+      {/* Toolbar: Search + Filter + Tambah */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="grid flex-1 gap-3 md:grid-cols-2">
+          {/* Search */}
           <div className="relative">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
@@ -264,15 +279,16 @@ export default function AdminGlossary() {
             />
           </div>
 
+          {/* Filter Status */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
           >
             <option value="">Semua Status</option>
-            {STATUS_OPTIONS.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
@@ -288,102 +304,123 @@ export default function AdminGlossary() {
         </button>
       </div>
 
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      {/* Tabel Daftar Istilah */}
+      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white shadow-sm">
+        {/* Header section */}
+        <div className="flex flex-col gap-3 border-b border-[var(--color-admin4)] px-7 py-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
               <Info className="h-5 w-5 text-[var(--color-admin)]" />
             </div>
-
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-gray-800">
                 Daftar Istilah Glosarium
               </h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-500">
                 Edit link sumber, ubah status, atau hapus istilah.
               </p>
             </div>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--color-admin)] px-5 py-2 text-sm font-semibold text-white shadow-sm">
+          <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--color-admin)] px-5 py-2 text-sm font-semibold text-white shadow-sm">
             <BookOpen className="h-4 w-4" />
-            Total Istilah: {items.length}
+            Total: {items.length} istilah
           </div>
         </div>
 
+        {/* Konten tabel */}
         {isLoading ? (
-          <div className="py-10 text-center text-gray-500">Memuat data...</div>
+          <div className="py-16 text-center text-gray-400">Memuat data...</div>
         ) : filteredItems.length > 0 ? (
-          <div className="grid gap-5 lg:grid-cols-2">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-2xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-5"
-              >
-                <div className="mb-4 flex items-start justify-between gap-4">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-bold leading-snug text-gray-800">
-                      {item.term}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px]">
+              <thead>
+                <tr className="border-b border-[var(--color-admin4)] bg-[var(--color-admin3)] text-left text-sm font-semibold text-gray-600">
+                  <th className="px-6 py-4 w-[22%]">Istilah</th>
+                  <th className="px-6 py-4 w-[35%]">Definisi</th>
+                  <th className="px-6 py-4 w-[18%]">Status</th>
+                  <th className="px-6 py-4 w-[15%]">Sumber</th>
+                  <th className="px-6 py-4 w-[10%] text-center">Aksi</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-[var(--color-admin4)]">
+                {filteredItems.map((item) => (
+                  <tr
+                    key={item.id}
+                    className="group transition-colors hover:bg-[var(--color-admin3)]/60"
+                  >
+                    {/* Istilah */}
+                    <td className="px-6 py-4">
+                      <p className="font-semibold text-gray-800">{item.term}</p>
+                      {item.verifiedBy && (
+                        <p className="mt-1 text-xs text-gray-400">
+                          oleh {item.verifiedBy}
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Definisi */}
+                    <td className="px-6 py-4">
+                      <p className="line-clamp-3 text-sm leading-relaxed text-gray-600">
+                        {item.definition}
+                      </p>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-6 py-4">
                       {getStatusBadge(item.verificationStatus)}
-                    </div>
-                  </div>
+                    </td>
 
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(item)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-admin4)] bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-[var(--color-admin)] hover:text-[var(--color-admin)]"
-                    >
-                      <Pencil size={16} />
-                      Edit
-                    </button>
+                    {/* Sumber */}
+                    <td className="px-6 py-4">
+                      {item.sourceUrl ? (
+                        <a
+                          href={item.sourceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={item.sourceUrl}
+                          className="inline-flex items-center gap-1 text-sm text-[var(--color-admin)] underline underline-offset-4 transition hover:opacity-75"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                          <span className="max-w-[120px] truncate">
+                            {truncateUrl(item.sourceUrl)}
+                          </span>
+                        </a>
+                      ) : (
+                        <span className="text-sm text-gray-400">—</span>
+                      )}
+                    </td>
 
-                    <button
-                      type="button"
-                      onClick={() => openDeleteModal(item)}
-                      className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100"
-                    >
-                      <Trash2 size={16} />
-                      Hapus
-                    </button>
-                  </div>
-                </div>
+                    {/* Aksi */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(item)}
+                          title="Edit"
+                          className="rounded-lg border border-[var(--color-admin4)] bg-white p-2 text-gray-500 transition hover:border-[var(--color-admin)] hover:text-[var(--color-admin)]"
+                        >
+                          <Pencil size={15} />
+                        </button>
 
-                <p className="mb-4 leading-relaxed text-gray-600">
-                  {item.definition}
-                </p>
-
-                <div className="space-y-2 rounded-xl bg-white/80 p-4 text-sm text-gray-600 border border-[var(--color-admin4)]">
-                  <p>
-                    <span className="font-semibold text-gray-800">Link Sumber:</span>{" "}
-                    {item.sourceUrl ? (
-                      <a
-                        href={item.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[var(--color-admin)] underline break-all"
-                      >
-                        {item.sourceUrl}
-                      </a>
-                    ) : (
-                      "-"
-                    )}
-                  </p>
-
-                  {item.verifiedBy && (
-                    <p>
-                      <span className="font-semibold text-gray-800">Terverifikasi oleh:</span>{" "}
-                      {item.verifiedBy}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
+                        <button
+                          type="button"
+                          onClick={() => openDeleteModal(item)}
+                          title="Hapus"
+                          className="rounded-lg border border-red-200 bg-red-50 p-2 text-red-400 transition hover:bg-red-100 hover:text-red-600"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-[var(--color-admin4)] bg-[var(--color-admin3)] px-6 py-14 text-center">
+          <div className="rounded-b-3xl border-t border-dashed border-[var(--color-admin4)] bg-[var(--color-admin3)] px-6 py-16 text-center">
             <p className="text-xl font-semibold text-gray-700">
               Data tidak ditemukan
             </p>
@@ -394,9 +431,11 @@ export default function AdminGlossary() {
         )}
       </section>
 
+      {/* Modal Tambah / Edit */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6">
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-2xl">
+            {/* Modal Header */}
             <div className="mb-6 flex items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
@@ -406,7 +445,7 @@ export default function AdminGlossary() {
                   <h2 className="text-2xl font-bold text-gray-800">
                     {editingId ? "Edit Istilah" : "Tambah Istilah Baru"}
                   </h2>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-500">
                     Isi istilah, definisi, link sumber, dan status verifikasi.
                   </p>
                 </div>
@@ -415,56 +454,61 @@ export default function AdminGlossary() {
               <button
                 type="button"
                 onClick={closeModal}
-                className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Istilah */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Istilah <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="term"
+                  value={formData.term}
+                  onChange={handleChange}
+                  placeholder="Contoh: PER"
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                />
+              </div>
+
+              {/* Definisi */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Definisi <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  name="definition"
+                  value={formData.definition}
+                  onChange={handleChange}
+                  rows={5}
+                  placeholder="Masukkan definisi istilah..."
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                />
+              </div>
+
+              {/* Link Sumber */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Link Sumber
+                </label>
+                <input
+                  type="text"
+                  name="source_url"
+                  value={formData.source_url}
+                  onChange={handleChange}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                />
+              </div>
+
+              {/* Status + Verified By dalam satu baris */}
               <div className="grid gap-5 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Istilah
-                  </label>
-                  <input
-                    type="text"
-                    name="term"
-                    value={formData.term}
-                    onChange={handleChange}
-                    placeholder="Contoh: PER"
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Definisi
-                  </label>
-                  <textarea
-                    name="definition"
-                    value={formData.definition}
-                    onChange={handleChange}
-                    rows={5}
-                    placeholder="Masukkan definisi istilah..."
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Link Sumber
-                  </label>
-                  <input
-                    type="text"
-                    name="source_url"
-                    value={formData.source_url}
-                    onChange={handleChange}
-                    placeholder="https://..."
-                    className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  />
-                </div>
-
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Status Verifikasi
@@ -475,9 +519,9 @@ export default function AdminGlossary() {
                     onChange={handleChange}
                     className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-gray-800 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                   >
-                    {STATUS_OPTIONS.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
                       </option>
                     ))}
                   </select>
@@ -486,7 +530,7 @@ export default function AdminGlossary() {
                 {formData.verification_status === "verified" && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">
-                      Terverifikasi oleh
+                      Terverifikasi oleh <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -500,6 +544,7 @@ export default function AdminGlossary() {
                 )}
               </div>
 
+              {/* Tombol Aksi */}
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
@@ -523,6 +568,7 @@ export default function AdminGlossary() {
         </div>
       )}
 
+      {/* Modal Konfirmasi Hapus */}
       {isDeleteModalOpen && selectedItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 px-4">
           <div className="w-full max-w-sm rounded-2xl border border-[var(--color-admin4)] bg-white p-6 shadow-xl">
@@ -530,7 +576,6 @@ export default function AdminGlossary() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
                 <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
-
               <h3 className="text-lg font-semibold text-[#222222]">
                 Hapus Istilah?
               </h3>
@@ -547,14 +592,14 @@ export default function AdminGlossary() {
             <div className="flex gap-3">
               <button
                 onClick={closeDeleteModal}
-                className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white py-3 text-[#222222] transition hover:bg-[var(--color-admin3)]"
+                className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white py-3 font-medium text-[#222222] transition hover:bg-[var(--color-admin3)]"
               >
                 Batal
               </button>
 
               <button
                 onClick={handleDelete}
-                className="flex-1 rounded-xl bg-red-500 py-3 text-white transition hover:bg-red-600"
+                className="flex-1 rounded-xl bg-red-500 py-3 font-medium text-white transition hover:bg-red-600"
               >
                 Ya, Hapus
               </button>

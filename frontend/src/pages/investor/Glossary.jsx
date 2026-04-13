@@ -4,6 +4,8 @@ import {
   BadgeCheck,
   Library,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
@@ -11,6 +13,7 @@ export default function InvestorGlossary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [glossaryItems, setGlossaryItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
 
   const fetchGlossary = async () => {
     setIsLoading(true);
@@ -62,21 +65,24 @@ export default function InvestorGlossary() {
     );
   };
 
+  const toggleExpand = (id) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 pb-16">
+      {/* Header */}
       <div className="rounded-3xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/30 p-8 backdrop-blur-md md:p-12">
-        <div className="mb-4 flex items-center gap-4">
-          <h1 className="text-4xl font-bold tracking-tight text-white md:text-5xl">
-            Glosarium Saham
-          </h1>
-        </div>
-
+        <h1 className="mb-4 text-4xl font-bold tracking-tight text-white md:text-5xl">
+          Glosarium Saham
+        </h1>
         <p className="max-w-3xl text-lg text-slate-300 md:text-xl">
-          Pahami istilah-istilah penting dalam dunia investasi saham dan analisis
-          pasar Indonesia.
+          Pahami istilah-istilah penting dalam dunia investasi saham dan
+          analisis pasar Indonesia.
         </p>
       </div>
 
+      {/* Search */}
       <div className="relative mx-auto max-w-2xl">
         <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-500" />
         <input
@@ -88,62 +94,112 @@ export default function InvestorGlossary() {
         />
       </div>
 
+      {/* Jumlah hasil */}
+      {!isLoading && (
+        <p className="text-sm text-slate-500">
+          Menampilkan{" "}
+          <span className="font-semibold text-slate-300">{filtered.length}</span>{" "}
+          istilah
+          {searchQuery && (
+            <>
+              {" "}
+              untuk kata kunci{" "}
+              <span className="font-semibold text-cyan-400">
+                &quot;{searchQuery}&quot;
+              </span>
+            </>
+          )}
+        </p>
+      )}
+
+      {/* Konten */}
       {isLoading ? (
         <div className="py-20 text-center">
           <p className="text-xl text-slate-400">Memuat glosarium...</p>
         </div>
       ) : filtered.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item) => (
-            <div
-              key={item.id}
-              className="group rounded-3xl border border-slate-800 bg-slate-900/65 p-7 backdrop-blur-md transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-900/20"
-            >
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                <h3 className="text-xl font-semibold text-cyan-400 transition-colors group-hover:text-cyan-300">
-                  {item.term}
-                </h3>
+          {filtered.map((item) => {
+            const isExpanded = expandedId === item.id;
 
-                {getStatusBadge(item.verificationStatus)}
-              </div>
+            return (
+              <div
+                key={item.id}
+                className="group flex flex-col rounded-3xl border border-slate-800 bg-slate-900/65 backdrop-blur-md transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-900/20"
+              >
+                {/* Card body - fixed area */}
+                <div className="flex flex-1 flex-col p-6">
+                  {/* Term + Badge */}
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="text-lg font-semibold text-cyan-400 transition-colors group-hover:text-cyan-300">
+                      {item.term}
+                    </h3>
+                    {getStatusBadge(item.verificationStatus)}
+                  </div>
 
-              <p className="mb-5 leading-relaxed text-slate-300">
-                {item.definition}
-              </p>
-
-              <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-sm text-slate-400">
-                {item.verifiedBy && (
-                  <p>
-                    <span className="font-semibold text-slate-200">
-                      Terverifikasi oleh:
-                    </span>{" "}
-                    {item.verifiedBy}
-                  </p>
-                )}
-
-                {item.sourceUrl && (
-                  <a
-                    href={item.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-cyan-300 underline underline-offset-4 transition hover:text-cyan-200"
+                  {/* Definisi: clamp default, expand kalau diklik */}
+                  <p
+                    className={`text-sm leading-relaxed text-slate-300 transition-all duration-300 ${
+                      isExpanded ? "" : "line-clamp-4"
+                    }`}
                   >
-                    <ExternalLink className="h-4 w-4" />
-                    Lihat sumber
-                  </a>
-                )}
+                    {item.definition}
+                  </p>
+
+                  {/* Tombol baca selengkapnya */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(item.id)}
+                    className="mt-3 inline-flex items-center gap-1 self-start text-xs font-medium text-cyan-400 transition hover:text-cyan-300"
+                  >
+                    {isExpanded ? (
+                      <>
+                        Sembunyikan <ChevronUp className="h-3.5 w-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        Baca selengkapnya <ChevronDown className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Footer info */}
+                <div className="space-y-2 rounded-b-3xl border-t border-slate-800 bg-slate-950/50 px-6 py-4 text-xs text-slate-400">
+                  {item.verifiedBy && (
+                    <p>
+                      <span className="font-semibold text-slate-300">
+                        Terverifikasi oleh:
+                      </span>{" "}
+                      {item.verifiedBy}
+                    </p>
+                  )}
+
+                  {item.sourceUrl ? (
+                    <a
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-cyan-400 underline underline-offset-4 transition hover:text-cyan-300"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                      Lihat sumber
+                    </a>
+                  ) : (
+                    <p className="text-slate-600">Tidak ada sumber</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="py-20 text-center">
           <p className="text-xl text-slate-400">
-            Tidak menemukan istilah yang sesuai dengan pencarian "{searchQuery}"
+            Tidak menemukan istilah yang sesuai dengan pencarian &quot;
+            {searchQuery}&quot;
           </p>
-          <p className="mt-2 text-slate-500">
-            Coba gunakan kata kunci lain.
-          </p>
+          <p className="mt-2 text-slate-500">Coba gunakan kata kunci lain.</p>
         </div>
       )}
     </div>
