@@ -1,8 +1,7 @@
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Stock, StockProfile, StockFundamental, StockPriceHistory
-from app.utils.logger import log_prediction, log_stock_crud, log_external_service
-from app.utils.auth_decorators import token_required, role_required
+from app.utils.logger import log_prediction, log_external_service
 from app.utils.ml_predictor import predict_stock_price
 from app.utils.yfinance_helper import YFinanceHelper
 from app.utils.text_helper import TextHelper
@@ -73,97 +72,6 @@ def get_stock_detail(ticker):
     if not stock:
         return jsonify({"success": False, "message": "Data saham tidak ditemukan."}), 404
     return jsonify({"success": True, "data": stock.to_dict()}), 200
-
-
-@stocks_bp.route("/admin/stocks", methods=["POST"])
-@token_required
-@role_required("admin")
-def create_stock():
-    data = request.get_json() or {}
-    ip_address = _request_ip()
-
-    ticker = (data.get("ticker") or "").strip().upper()
-    name = (data.get("name") or "").strip()
-    sector = (data.get("sector") or "").strip()
-    price = data.get("price", 0)
-    change_percent = (data.get("change") or data.get("change_percent") or "0.00%").strip()
-    status = (data.get("status") or "Active").strip()
-
-    if not ticker:
-        return jsonify({"success": False, "message": "Ticker wajib diisi."}), 400
-    if not name:
-        return jsonify({"success": False, "message": "Nama perusahaan wajib diisi."}), 400
-    if not sector:
-        return jsonify({"success": False, "message": "Sektor wajib diisi."}), 400
-
-    existing = Stock.query.filter_by(ticker=ticker).first()
-    if existing:
-        return jsonify({"success": False, "message": "Ticker saham sudah ada."}), 409
-
-    stock = Stock(
-        ticker=ticker,
-        name=name,
-        sector=sector,
-        price=price or 0,
-        change_percent=change_percent,
-        status=status or "Active"
-    )
-
-    db.session.add(stock)
-    db.session.commit()
-    log_stock_crud("CREATE", stock.id, ticker, user_id=g.current_user.get("id"), ip_address=ip_address)
-    return jsonify({"success": True, "message": "Data saham berhasil ditambahkan.", "data": stock.to_dict()}), 201
-
-
-@stocks_bp.route("/admin/stocks/<int:stock_id>", methods=["PUT"])
-@token_required
-@role_required("admin")
-def update_stock(stock_id):
-    ip_address = _request_ip()
-    stock = Stock.query.get(stock_id)
-    if not stock:
-        return jsonify({"success": False, "message": "Data saham tidak ditemukan."}), 404
-
-    data = request.get_json() or {}
-    ticker = (data.get("ticker") or "").strip().upper()
-    name = (data.get("name") or "").strip()
-    sector = (data.get("sector") or "").strip()
-    price = data.get("price", 0)
-    change_percent = (data.get("change") or data.get("change_percent") or "0.00%").strip()
-    status = (data.get("status") or "Active").strip()
-
-    if not ticker or not name or not sector:
-        return jsonify({"success": False, "message": "Ticker, nama perusahaan, dan sektor wajib diisi."}), 400
-
-    existing = Stock.query.filter(Stock.ticker == ticker, Stock.id != stock_id).first()
-    if existing:
-        return jsonify({"success": False, "message": "Ticker saham sudah digunakan data lain."}), 409
-
-    stock.ticker = ticker
-    stock.name = name
-    stock.sector = sector
-    stock.price = price or 0
-    stock.change_percent = change_percent
-    stock.status = status or "Active"
-    db.session.commit()
-    log_stock_crud("UPDATE", stock.id, ticker, user_id=g.current_user.get("id"), ip_address=ip_address)
-    return jsonify({"success": True, "message": "Data saham berhasil diperbarui.", "data": stock.to_dict()}), 200
-
-
-@stocks_bp.route("/admin/stocks/<int:stock_id>", methods=["DELETE"])
-@token_required
-@role_required("admin")
-def delete_stock(stock_id):
-    ip_address = _request_ip()
-    stock = Stock.query.get(stock_id)
-    if not stock:
-        return jsonify({"success": False, "message": "Data saham tidak ditemukan."}), 404
-
-    ticker = stock.ticker
-    db.session.delete(stock)
-    db.session.commit()
-    log_stock_crud("DELETE", stock_id, ticker, user_id=g.current_user.get("id"), ip_address=ip_address)
-    return jsonify({"success": True, "message": "Data saham berhasil dihapus."}), 200
 
 
 @stocks_bp.route("/market-overview", methods=["GET"])
@@ -350,7 +258,7 @@ def get_stock_prediction(ticker):
             log_prediction(ticker.upper(), False, "Model gagal menghasilkan prediksi.", ip_address=ip_address)
             return jsonify({"success": False, "message": "Prediksi gagal dijalankan."}), 500
 
-        log_prediction(ticker.upper(), True, rmse=result.get("rmse"), ip_address=ip_address)
+        log_prediction(ticker.upper(), True, mape=result.get("mape"), ip_address=ip_address)
         return jsonify({"success": True, "data": result}), 200
     except Exception as e:
         log_external_service("ML Prediction", f"Prediksi gagal untuk {ticker.upper()}", details=str(e), user_id=None, ip_address=ip_address)

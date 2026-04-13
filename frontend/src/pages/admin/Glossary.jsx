@@ -78,7 +78,7 @@ export default function AdminGlossary() {
     setIsLoading(true);
 
     try {
-      const { ok, data } = await apiFetch("/glossary");
+      const { ok, data } = await apiFetch("/admin/glossary");
 
       if (ok && data.success) {
         setItems(data.data || []);

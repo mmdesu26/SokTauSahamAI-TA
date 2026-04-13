@@ -219,7 +219,6 @@ export default function InvestorStockDetail() {
     predictionData?.price_expected_change_pct ??
     (closeToday === 0 ? 0 : (predDelta / closeToday) * 100);
 
-  const rmse = predictionData?.rmse || 0;
   const mape = predictionData?.mape || 0;
 
   const fundamentalPrediction = predictionData?.fundamental_prediction || {};
@@ -585,47 +584,36 @@ export default function InvestorStockDetail() {
                       </div>
 
                       <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
-                      <h3 className="mb-4 text-lg font-semibold text-cyan-200 text-center">
-                        Akurasi Prediksi Model Harga
-                      </h3>
+                        <h3 className="mb-4 text-center text-lg font-semibold text-cyan-200">
+                          Akurasi Prediksi Model Harga
+                        </h3>
 
-                      <div className="space-y-3 text-slate-300">
-                        <div className="flex items-center justify-between gap-4">
-                          <span>RMSE</span>
-                          <span className="text-right font-semibold text-white">
-                            {rmse.toFixed(2)}
-                          </span>
+                        <div className="space-y-3 text-slate-300">
+                          <div className="flex items-center justify-between gap-4">
+                            <span>MAPE</span>
+                            <span className="text-right font-semibold text-white">
+                              {mape.toFixed(2)}%
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-4">
+                            <span>Waktu Prediksi</span>
+                            <span className="text-right font-semibold text-white">
+                              {predictionData?.prediction_date || "-"}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-4">
-                          <span>MAPE</span>
-                          <span className="text-right font-semibold text-white">
-                            {mape.toFixed(2)}%
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-4">
-                          <span>Waktu Prediksi</span>
-                          <span className="text-right font-semibold text-white">
-                            {predictionData?.prediction_date || "-"}
-                          </span>
+                        <div className="mt-4 rounded-lg border border-slate-700/60 bg-slate-900/30 p-4 text-sm leading-relaxed text-slate-400">
+                          <p className="font-medium text-slate-300">Cara baca akurasi</p>
+                          <p className="mt-2">
+                            MAPE menunjukkan rata-rata persentase error prediksi terhadap harga aktual.
+                          </p>
+                          <p className="mt-1">
+                            Semakin kecil nilai MAPE, maka prediksi model semakin baik.
+                          </p>
                         </div>
                       </div>
-
-                      <div className="mt-4 rounded-lg border border-slate-700/60 bg-slate-900/30 p-4 text-sm leading-relaxed text-slate-400">
-                        <p className="font-medium text-slate-300">Cara baca akurasi</p>
-                        <p className="mt-2">
-                          RMSE menunjukkan rata-rata selisih hasil prediksi terhadap harga aktual
-                          dalam satuan rupiah.
-                        </p>
-                        <p className="mt-1">
-                          MAPE menunjukkan rata-rata persentase error prediksi terhadap harga aktual.
-                        </p>
-                        <p className="mt-1">
-                          Semakin kecil nilai RMSE dan MAPE, maka prediksi model semakin baik.
-                        </p>
-                      </div>
-                    </div>
 
                       <div className="flex gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-5 text-slate-200">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />

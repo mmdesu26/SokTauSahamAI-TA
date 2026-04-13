@@ -1,11 +1,22 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 
 from app import db
 from app.models import Glossary
+from app.utils.auth_decorators import token_required, role_required
+from app.utils.logger import log_glossary
+
 
 glossary_bp = Blueprint("glossary_bp", __name__)
 
 ALLOWED_STATUSES = ["literature_based", "verified"]
+
+
+def _user_id():
+    return getattr(g, "current_user", {}).get("id")
+
+
+def _ip_address():
+    return request.headers.get("X-Forwarded-For", request.remote_addr)
 
 
 def normalize_glossary_payload(data):
@@ -36,8 +47,7 @@ def validate_glossary_payload(payload):
     return None
 
 
-@glossary_bp.route("/glossary", methods=["GET"])
-def get_glossary():
+def _build_glossary_query():
     search = request.args.get("search", "").strip()
     verification_status = request.args.get("verification_status", "").strip()
 
@@ -56,14 +66,21 @@ def get_glossary():
     if verification_status:
         query = query.filter(Glossary.verification_status == verification_status)
 
-    items = query.order_by(Glossary.term.asc()).all()
+    return query.order_by(Glossary.term.asc())
 
-    return jsonify(
-        {
-            "success": True,
-            "data": [item.to_dict() for item in items],
-        }
-    ), 200
+
+@glossary_bp.route("/glossary", methods=["GET"])
+def get_glossary():
+    items = _build_glossary_query().all()
+    return jsonify({"success": True, "data": [item.to_dict() for item in items]}), 200
+
+
+@glossary_bp.route("/admin/glossary", methods=["GET"])
+@token_required
+@role_required("admin")
+def get_glossary_admin():
+    items = _build_glossary_query().all()
+    return jsonify({"success": True, "data": [item.to_dict() for item in items]}), 200
 
 
 @glossary_bp.route("/glossary/<int:glossary_id>", methods=["GET"])
@@ -87,6 +104,8 @@ def get_glossary_detail(glossary_id):
 
 
 @glossary_bp.route("/admin/glossary", methods=["POST"])
+@token_required
+@role_required("admin")
 def create_glossary():
     data = request.get_json() or {}
     payload = normalize_glossary_payload(data)
@@ -101,19 +120,37 @@ def create_glossary():
 
     glossary = Glossary(**payload)
 
-    db.session.add(glossary)
-    db.session.commit()
-
-    return jsonify(
-        {
-            "success": True,
-            "message": "Istilah berhasil ditambahkan.",
-            "data": glossary.to_dict(),
-        }
-    ), 201
+    try:
+        db.session.add(glossary)
+        db.session.commit()
+        log_glossary(
+            "CREATE",
+            glossary.term,
+            user_id=_user_id(),
+            ip_address=_ip_address(),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "Istilah berhasil ditambahkan.",
+                "data": glossary.to_dict(),
+            }
+        ), 201
+    except Exception as e:
+        db.session.rollback()
+        log_glossary(
+            "CREATE",
+            payload["term"] or "UNKNOWN",
+            user_id=_user_id(),
+            error=str(e),
+            ip_address=_ip_address(),
+        )
+        return jsonify({"success": False, "message": "Gagal menambahkan istilah."}), 500
 
 
 @glossary_bp.route("/admin/glossary/<int:glossary_id>", methods=["PUT"])
+@token_required
+@role_required("admin")
 def update_glossary(glossary_id):
     glossary = Glossary.query.get(glossary_id)
 
@@ -151,18 +188,36 @@ def update_glossary(glossary_id):
     glossary.verification_status = payload["verification_status"]
     glossary.verified_by = payload["verified_by"]
 
-    db.session.commit()
-
-    return jsonify(
-        {
-            "success": True,
-            "message": "Data glosarium berhasil diperbarui.",
-            "data": glossary.to_dict(),
-        }
-    ), 200
+    try:
+        db.session.commit()
+        log_glossary(
+            "UPDATE",
+            glossary.term,
+            user_id=_user_id(),
+            ip_address=_ip_address(),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "Data glosarium berhasil diperbarui.",
+                "data": glossary.to_dict(),
+            }
+        ), 200
+    except Exception as e:
+        db.session.rollback()
+        log_glossary(
+            "UPDATE",
+            payload["term"] or glossary.term or "UNKNOWN",
+            user_id=_user_id(),
+            error=str(e),
+            ip_address=_ip_address(),
+        )
+        return jsonify({"success": False, "message": "Gagal memperbarui data glosarium."}), 500
 
 
 @glossary_bp.route("/admin/glossary/<int:glossary_id>", methods=["DELETE"])
+@token_required
+@role_required("admin")
 def delete_glossary(glossary_id):
     glossary = Glossary.query.get(glossary_id)
 
@@ -174,12 +229,30 @@ def delete_glossary(glossary_id):
             }
         ), 404
 
-    db.session.delete(glossary)
-    db.session.commit()
+    term = glossary.term
 
-    return jsonify(
-        {
-            "success": True,
-            "message": "Data glosarium berhasil dihapus.",
-        }
-    ), 200
+    try:
+        db.session.delete(glossary)
+        db.session.commit()
+        log_glossary(
+            "DELETE",
+            term,
+            user_id=_user_id(),
+            ip_address=_ip_address(),
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "Data glosarium berhasil dihapus.",
+            }
+        ), 200
+    except Exception as e:
+        db.session.rollback()
+        log_glossary(
+            "DELETE",
+            term or "UNKNOWN",
+            user_id=_user_id(),
+            error=str(e),
+            ip_address=_ip_address(),
+        )
+        return jsonify({"success": False, "message": "Gagal menghapus data glosarium."}), 500

@@ -95,9 +95,9 @@ def log_stock_crud(action: str, stock_id: int, ticker: str, user_id: int = None,
 
 
 # log buat hasil prediksi ML
-def log_prediction(ticker: str, success: bool, error_msg: str = None, rmse: float = None, user_id: int = None, ip_address: str = None):
+def log_prediction(ticker: str, success: bool, error_msg: str = None, mape: float = None, user_id: int = None, ip_address: str = None):
     if success:
-        suffix = f" (RMSE: {rmse:.2f})" if rmse is not None else ""  # kalau ada nilai RMSE
+        suffix = f" (MAPE: {mape:.2f}%)" if mape is not None else ""
         SystemLogger.success(
             source="ML Prediction",
             message=f"Prediksi berhasil dibuat untuk {ticker}{suffix}",

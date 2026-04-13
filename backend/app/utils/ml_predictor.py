@@ -4,7 +4,7 @@ import pandas as pd
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 
 from app.utils.yfinance_helper import YFinanceHelper
@@ -20,7 +20,7 @@ class StockPricePredictor:
        - Random Forest + Linear Regression
        - Prediksi harga closing 1 hari ke depan
        - Dilatih menggunakan target return 1 hari ke depan
-       - Fitur: lag harga closing historis
+       - Fitur: lag harga closing historis + return + volume + volume_change + range + open-close change
 
     2) MODEL FUNDAMENTAL
        - Analisis fundamental untuk horizon 3 bulan
@@ -28,11 +28,21 @@ class StockPricePredictor:
        - Fitur: EPS, ROE, PBV, PER
     """
 
-    def __init__(self, ticker, days=365, forecast_horizon=1, lag_days=10):
+    def __init__(
+        self,
+        ticker,
+        days=730,
+        forecast_horizon=1,
+        lag_days=15,
+        cutoff_date=None,
+        historical_df=None,
+    ):
         self.ticker = ticker
         self.days = days
         self.forecast_horizon = forecast_horizon
         self.lag_days = lag_days
+        self.cutoff_date = self._coerce_date(cutoff_date)
+        self.historical_df = historical_df
 
         self.rf_model = RandomForestRegressor(
             n_estimators=400,
@@ -40,7 +50,7 @@ class StockPricePredictor:
             min_samples_split=5,
             min_samples_leaf=2,
             random_state=42,
-            n_jobs=-1
+            n_jobs=-1,
         )
         self.lr_model = LinearRegression()
         self.scaler = StandardScaler()
@@ -51,9 +61,27 @@ class StockPricePredictor:
         self.fundamentals = None
         self.ensemble_weights = {"rf": 0.5, "lr": 0.5}
 
-        self.price_feature_columns = [
-            f"lag_close_{i}" for i in range(1, self.lag_days + 1)
-        ]
+        self.price_feature_columns = self._build_price_feature_columns()
+
+    def _build_price_feature_columns(self):
+        feature_cols = []
+
+        for i in range(1, self.lag_days + 1):
+            feature_cols.append(f"lag_close_{i}")
+
+        for i in range(1, self.lag_days + 1):
+            feature_cols.append(f"lag_return_{i}")
+
+        for i in range(1, self.lag_days + 1):
+            feature_cols.append(f"lag_volume_{i}")
+
+        feature_cols.extend([
+            "daily_range",
+            "open_close_change",
+            "volume_change",
+        ])
+
+        return feature_cols
 
     @staticmethod
     def _safe_float(value, default=0.0):
@@ -64,34 +92,104 @@ class StockPricePredictor:
         except Exception:
             return default
 
-    def prepare_price_dataset(self):
-        hist_df = YFinanceHelper.get_historical_prices(
-            self.ticker,
-            days=self.days,
-            exclude_today=True
-        )
+    @staticmethod
+    def _coerce_date(value):
+        if value in (None, ""):
+            return None
+        try:
+            return pd.Timestamp(value).date()
+        except Exception:
+            return None
+
+    def _get_source_history(self):
+        if self.historical_df is not None:
+            hist_df = self.historical_df.copy()
+        else:
+            hist_df = YFinanceHelper.get_historical_prices(
+                self.ticker,
+                days=self.days,
+                exclude_today=True,
+            )
 
         if hist_df is None or hist_df.empty:
             logger.error("Data historis kosong untuk %s", self.ticker)
+            return None
+
+        hist_df = hist_df.copy()
+        hist_df = hist_df.sort_index()
+
+        if self.cutoff_date is not None:
+            hist_df = hist_df[hist_df.index.date <= self.cutoff_date]
+
+        if self.days and len(hist_df) > self.days:
+            hist_df = hist_df.tail(self.days)
+
+        if hist_df.empty:
+            logger.error("Data historis kosong setelah filtering cutoff untuk %s", self.ticker)
+            return None
+
+        required_cols = {"Open", "High", "Low", "Close", "Volume"}
+        missing_cols = required_cols - set(hist_df.columns)
+        if missing_cols:
+            logger.error(
+                "Kolom historis tidak lengkap untuk %s. Missing: %s",
+                self.ticker,
+                ", ".join(sorted(missing_cols)),
+            )
+            return None
+
+        return hist_df
+
+    def prepare_price_dataset(self):
+        hist_df = self._get_source_history()
+        if hist_df is None or hist_df.empty:
             return None
 
         if "Close" not in hist_df.columns:
             logger.error("Kolom Close tidak ditemukan untuk %s", self.ticker)
             return None
 
-        # simpan close trading terakhir yang completed sebelum proses shift/dropna
         self.latest_completed_close = {
             "date": hist_df.index[-1].strftime("%Y-%m-%d"),
             "close": float(hist_df.iloc[-1]["Close"]),
         }
 
-        df = hist_df[["Close"]].copy()
-        df.columns = ["close"]
-        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        df = hist_df[["Open", "High", "Low", "Close", "Volume"]].copy()
+        df.columns = ["open", "high", "low", "close", "volume"]
 
+        df["open"] = pd.to_numeric(df["open"], errors="coerce")
+        df["high"] = pd.to_numeric(df["high"], errors="coerce")
+        df["low"] = pd.to_numeric(df["low"], errors="coerce")
+        df["close"] = pd.to_numeric(df["close"], errors="coerce")
+        df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
+
+        # Fitur tambahan non-teknikal berbasis data pasar mentah
+        df["return"] = df["close"].pct_change()
+        df["daily_range"] = np.where(
+            np.abs(df["close"]) < 1e-8,
+            0.0,
+            (df["high"] - df["low"]) / df["close"],
+        )
+        df["open_close_change"] = np.where(
+            np.abs(df["open"]) < 1e-8,
+            0.0,
+            (df["close"] - df["open"]) / df["open"],
+        )
+        df["volume_change"] = df["volume"].pct_change()
+
+        # Lag close
         for i in range(1, self.lag_days + 1):
             df[f"lag_close_{i}"] = df["close"].shift(i)
 
+        # Lag return
+        for i in range(1, self.lag_days + 1):
+            df[f"lag_return_{i}"] = df["return"].shift(i)
+
+        # Lag volume
+        for i in range(1, self.lag_days + 1):
+            df[f"lag_volume_{i}"] = df["volume"].shift(i)
+
+        # Target return 1 hari/trading day ke depan
         df["target_return_future"] = (
             df["close"].shift(-self.forecast_horizon) - df["close"]
         ) / df["close"]
@@ -101,7 +199,7 @@ class StockPricePredictor:
         if len(df) < 120:
             logger.error(
                 "Dataset harga terlalu sedikit setelah preprocessing untuk %s",
-                self.ticker
+                self.ticker,
             )
             return None
 
@@ -118,6 +216,11 @@ class StockPricePredictor:
             return None, None
 
         return train_df, test_df
+
+    @staticmethod
+    def _calculate_mape(actual_prices, predicted_prices):
+        actual_safe = np.where(np.abs(actual_prices) < 1e-8, 1e-8, actual_prices)
+        return float(np.mean(np.abs((actual_prices - predicted_prices) / actual_safe)) * 100)
 
     def train_price_model(self):
         df = self.prepare_price_dataset()
@@ -148,25 +251,21 @@ class StockPricePredictor:
         rf_pred_price = current_close_test * (1 + rf_pred_return)
         lr_pred_price = current_close_test * (1 + lr_pred_return)
 
-        rf_rmse = float(np.sqrt(mean_squared_error(y_test_price, rf_pred_price)))
-        lr_rmse = float(np.sqrt(mean_squared_error(y_test_price, lr_pred_price)))
+        # RMSE tetap dipakai internal untuk penentuan bobot ensemble,
+        # tetapi tidak diekspos lagi sebagai metrik akurasi sistem.
+        rf_rmse_internal = float(np.sqrt(mean_squared_error(y_test_price, rf_pred_price)))
+        lr_rmse_internal = float(np.sqrt(mean_squared_error(y_test_price, lr_pred_price)))
 
         eps = 1e-8
-        inv_rf = 1.0 / max(rf_rmse, eps)
-        inv_lr = 1.0 / max(lr_rmse, eps)
+        inv_rf = 1.0 / max(rf_rmse_internal, eps)
+        inv_lr = 1.0 / max(lr_rmse_internal, eps)
         weight_sum = inv_rf + inv_lr
 
         rf_weight = inv_rf / weight_sum
         lr_weight = inv_lr / weight_sum
 
         ensemble_pred_price = (rf_pred_price * rf_weight) + (lr_pred_price * lr_weight)
-
-        mse = float(mean_squared_error(y_test_price, ensemble_pred_price))
-        rmse = float(np.sqrt(mse))
-        mae = float(mean_absolute_error(y_test_price, ensemble_pred_price))
-
-        y_test_price_safe = np.where(np.abs(y_test_price) < 1e-8, 1e-8, y_test_price)
-        mape = float(np.mean(np.abs((y_test_price - ensemble_pred_price) / y_test_price_safe)) * 100)
+        mape = self._calculate_mape(y_test_price, ensemble_pred_price)
 
         self.dataset = df
         self.ensemble_weights = {
@@ -174,12 +273,7 @@ class StockPricePredictor:
             "lr": float(round(lr_weight, 4)),
         }
         self.metrics = {
-            "mse": mse,
-            "rmse": rmse,
-            "mae": mae,
             "mape": mape,
-            "rf_rmse": rf_rmse,
-            "lr_rmse": lr_rmse,
             "train_size": int(len(train_df)),
             "test_size": int(len(test_df)),
         }
@@ -233,7 +327,6 @@ class StockPricePredictor:
             score -= 0.5
 
         estimated_return_pct = max(min(score * 5.0, 15.0), -15.0)
-
         direction = "Naik" if estimated_return_pct >= 0 else "Turun"
 
         recommendation = "HOLD"
@@ -269,10 +362,8 @@ class StockPricePredictor:
             logger.error("Latest completed close tidak tersedia untuk %s", self.ticker)
             return None
 
-        # pakai close trading terakhir yang benar-benar completed
         current_price = float(self.latest_completed_close["close"])
 
-        # ambil fitur terbaru dari dataset training
         latest_features_row = self.dataset.iloc[-1]
         X_latest = latest_features_row[self.price_feature_columns].to_frame().T.values
         X_latest_scaled = self.scaler.transform(X_latest)
@@ -312,16 +403,8 @@ class StockPricePredictor:
             "current_price_date": self.latest_completed_close["date"],
             "price_expected_change_pct": float(round(price_change_pct, 2)),
             "price_recommendation": price_recommendation,
-
-            "mse": float(round(self.metrics["mse"], 4)),
-            "rmse": float(round(self.metrics["rmse"], 4)),
-            "mae": float(round(self.metrics["mae"], 4)),
             "mape": float(round(self.metrics["mape"], 4)),
-            "rf_rmse": float(round(self.metrics["rf_rmse"], 4)),
-            "lr_rmse": float(round(self.metrics["lr_rmse"], 4)),
-
             "fundamental_prediction": fundamental_view,
-
             "prediction_date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
             "features_used": {
                 "price_model": {
@@ -340,7 +423,8 @@ class StockPricePredictor:
                 "test_size": self.metrics["test_size"],
                 "evaluation_method": "time-series holdout split",
                 "price_metric_basis": "predicted return converted back to price",
-            }
+                "accuracy_metric": "MAPE",
+            },
         }
 
 
@@ -349,7 +433,7 @@ def predict_stock_price(ticker):
         predictor = StockPricePredictor(
             ticker=ticker,
             forecast_horizon=1,
-            lag_days=10
+            lag_days=15,
         )
         if not predictor.train_price_model():
             return None

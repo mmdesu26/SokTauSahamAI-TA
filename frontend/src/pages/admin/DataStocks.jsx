@@ -44,7 +44,7 @@ export default function AdminDataStocks() {
     setIsLoading(true);
 
     try {
-      const { ok, data } = await apiFetch("/stocks");
+      const { ok, data } = await apiFetch("/admin/stocks");
 
       if (ok && data?.success) {
         setStocks(data.data || []);
