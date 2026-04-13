@@ -28,7 +28,7 @@ class StockPricePredictor:
        - Fitur: EPS, ROE, PBV, PER
     """
 
-    def __init__(self, ticker, days=720, forecast_horizon=1, lag_days=10):
+    def __init__(self, ticker, days=365, forecast_horizon=1, lag_days=10):
         self.ticker = ticker
         self.days = days
         self.forecast_horizon = forecast_horizon

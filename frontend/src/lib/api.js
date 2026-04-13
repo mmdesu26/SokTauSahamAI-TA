@@ -1,7 +1,8 @@
 import { clearAdminSession, getToken } from "@/utils/authSession";
 
 const isDev = import.meta.env.DEV;
-const BASE_URL = isDev ? "/api" : "https://api.soktausaham.com/api";
+const BASE_URL = isDev ? "/api" : "https://flukey-donald-unsubscribing.ngrok-free.dev/api";
+// const BASE_URL = isDev ? "/api" : "https://api.soktausaham.com/api";
 
 export async function apiFetch(endpoint, options = {}) {
   const token = getToken();
@@ -10,6 +11,7 @@ export async function apiFetch(endpoint, options = {}) {
   const response = await fetch(url, {
     ...options,
     headers: {
+      "ngrok-skip-browser-warning": "true",
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
