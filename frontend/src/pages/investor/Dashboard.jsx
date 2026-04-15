@@ -188,7 +188,7 @@ export default function InvestorDashboard() {
         </h1>
         <ul className="max-w-3xl list-disc space-y-2 pl-5 text-lg text-slate-300 md:text-xl">
         <li>
-          Analisis saham hanya sebagai referensi, bukan rekomendasi beli/jual.
+          Analisis saham hanya sebagai referensi, bukan ajakan jual beli.
         </li>
         <li>
           Lakukan riset tambahan sebelum membuat keputusan investasi.

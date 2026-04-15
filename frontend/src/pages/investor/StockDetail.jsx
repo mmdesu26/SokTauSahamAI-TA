@@ -380,7 +380,7 @@ export default function InvestorStockDetail() {
           {formatChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
         </p>
         <p className="ml-2.5 mt-1 text-left text-xs text-amber-200/90">
-          Data ini bukan harga realtime dan grafik hanya visualisasi historis dari yfinance, bukan harga prediksi.
+          Data ini bukan harga realtime dan grafik hanya visualisasi historis dari yfinance.
         </p>
 
         <div className="relative h-80 md:h-[420px]">
@@ -459,10 +459,6 @@ export default function InvestorStockDetail() {
                       <h2 className="text-xl font-bold text-cyan-200 md:text-2xl">
                         Hasil Prediksi Harga Closing Besok dan Arah Tren 3 Bulan ke Depan
                       </h2>
-                      <h2 className="text-xl text-cyan-100 md:text-1xl">
-                       (Disarankan melakukan prediksi sebelum market buka 
-                       keesokan hari agar menggunakan harga penutupan harian terbaru yang sudah final)
-                      </h2>
                     </div>
 
                     <div className="flex w-full flex-col gap-6">
@@ -479,21 +475,10 @@ export default function InvestorStockDetail() {
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-400 mt-2">
-                            * Menggunakan harga penutupan harian terakhir yang sudah completed dari data historis.
-                          </p>
-
                           <div className="flex items-center justify-between gap-4">
-                            <span>Tanggal close data model</span>
+                            <span>Tanggal close (data model)</span>
                             <span className="text-right font-semibold text-white">
                               {closeTodayDate}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-4">
-                            <span>Harga saat ini (chart)</span>
-                            <span className="text-right font-semibold text-white">
-                              {formatIDR(Number(last.close || 0))}
                             </span>
                           </div>
 
@@ -514,20 +499,6 @@ export default function InvestorStockDetail() {
                               {predDelta >= 0 ? "+" : ""}
                               {formatIDR(predDelta)} ({pricePredPct >= 0 ? "+" : ""}
                               {pricePredPct.toFixed(2)}%)
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-4">
-                            <span>Random Forest</span>
-                            <span className="text-right font-semibold text-white">
-                              {formatIDR(predictionData?.rf_prediction)}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-4">
-                            <span>Linear Regression</span>
-                            <span className="text-right font-semibold text-white">
-                              {formatIDR(predictionData?.lr_prediction)}
                             </span>
                           </div>
                         </div>
@@ -574,13 +545,7 @@ export default function InvestorStockDetail() {
                               {recommendation}
                             </span>
                           </div>
-
-                          <div className="space-y-2 pt-2 text-sm leading-relaxed text-slate-400">
-                            <p>Model harga: Random Forest + Linear Regression</p>
-                            <p>Input model harga: lag closing price historis</p>
-                            <p>Analisis fundamental: EPS, PER, PBV, ROE</p>
                           </div>
-                        </div>
                       </div>
 
                       <div className="w-full rounded-xl border border-slate-700 bg-slate-800/40 p-6">
@@ -621,8 +586,7 @@ export default function InvestorStockDetail() {
                         <div>
                           <p className="font-semibold text-amber-200">Disclaimer</p>
                           <p className="mt-1 text-sm leading-relaxed text-slate-300/90">
-                            Sistem ini memisahkan model harga dan analisis fundamental. Prediksi harga
-                            dibuat dengan Random Forest dan Linear Regression berbasis histori closing,
+                            Sistem ini prediksi harga dengan Random Forest dan Linear Regression berbasis histori closing,
                             sedangkan return 3 bulan, arah, dan rekomendasi berasal dari analisis
                             fundamental EPS, PER, PBV, dan ROE. Hasil bukan kepastian dan bukan
                             rekomendasi investasi.
