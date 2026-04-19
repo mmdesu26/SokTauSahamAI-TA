@@ -1,31 +1,39 @@
-import logging
-import numpy as np
-import pandas as pd
+"""
+Compatibility wrapper untuk modul ML yang sudah dipisah.
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import StandardScaler
+Tujuan:
+- Menjaga backward compatibility (kompatibilitas lama)
+- Supaya import lama tetap bisa dipakai tanpa error
 
-from app.utils.yfinance_helper import YFinanceHelper
+Contoh import lama:
+    from app.utils.ml_predictor import predict_stock_price, StockPricePredictor
 
-logger = logging.getLogger(__name__)
+Padahal sekarang modul sudah dipisah ke:
+    app.ml.config
+    app.ml.training
+    app.ml.inference
+"""
+
+# Import konfigurasi model
+from app.ml.config import PriceModelConfig
+
+# Import service inference (prediksi) dan fungsi helper
+from app.ml.inference import StockPredictionService, predict_stock_price
+
+# Import trainer untuk training model
+from app.ml.training import PriceModelTrainer
 
 
 class StockPricePredictor:
     """
-    SISTEM PREDIKSI DUAL-MODEL
+    Wrapper class untuk menyatukan:
+    - Config
+    - Training
+    - Prediction (inference)
 
-    1) MODEL HARGA
-       - Random Forest + Linear Regression
-       - Prediksi harga closing 1 hari ke depan
-       - Dilatih menggunakan target return 1 hari ke depan
-       - Fitur: lag harga closing historis + return + volume + volume_change + range + open-close change
-
-    2) MODEL FUNDAMENTAL
-       - Analisis fundamental untuk horizon 3 bulan
-       - Output: estimasi return 3 bulan, arah, dan rekomendasi
-       - Fitur: EPS, ROE, PBV, PER
+    Tujuannya:
+    - Menyederhanakan penggunaan ML dari luar
+    - Menjadi interface tunggal (facade pattern)
     """
 
     def __init__(
@@ -37,407 +45,100 @@ class StockPricePredictor:
         cutoff_date=None,
         historical_df=None,
     ):
-        self.ticker = ticker
-        self.days = days
-        self.forecast_horizon = forecast_horizon
-        self.lag_days = lag_days
-        self.cutoff_date = self._coerce_date(cutoff_date)
+        """
+        Inisialisasi predictor
+
+        Parameter:
+        - ticker: kode saham (contoh: BBCA, AAPL)
+        - days: jumlah hari data historis
+        - forecast_horizon: prediksi berapa hari ke depan
+        - lag_days: jumlah fitur lag
+        - cutoff_date: batas data historis
+        - historical_df: optional dataframe manual (override API)
+        """
+
+        # Membuat config model
+        self.config = PriceModelConfig(
+            ticker=ticker,
+            days=days,
+            forecast_horizon=forecast_horizon,
+            lag_days=lag_days,
+            cutoff_date=cutoff_date,
+        )
+
+        # Data historis opsional (kalau tidak mau ambil dari API)
         self.historical_df = historical_df
 
-        self.rf_model = RandomForestRegressor(
-            n_estimators=400,
-            max_depth=10,
-            min_samples_split=5,
-            min_samples_leaf=2,
-            random_state=42,
-            n_jobs=-1,
-        )
-        self.lr_model = LinearRegression()
-        self.scaler = StandardScaler()
+        # Trainer → untuk melatih model
+        self.trainer = PriceModelTrainer(self.config, historical_df=historical_df)
 
-        self.dataset = None
-        self.latest_completed_close = None
-        self.metrics = None
-        self.fundamentals = None
+        # Service → untuk inference/prediksi
+        self.service = StockPredictionService(self.config, historical_df=historical_df)
+
+        # Variabel internal
+        self.dataset = None  # dataset hasil preprocessing
+        self.latest_completed_close = None  # harga terakhir
+        self.metrics = None  # hasil evaluasi model
+
+        # Default bobot ensemble (akan diupdate setelah training)
         self.ensemble_weights = {"rf": 0.5, "lr": 0.5}
 
-        self.price_feature_columns = self._build_price_feature_columns()
-
-    def _build_price_feature_columns(self):
-        feature_cols = []
-
-        for i in range(1, self.lag_days + 1):
-            feature_cols.append(f"lag_close_{i}")
-
-        for i in range(1, self.lag_days + 1):
-            feature_cols.append(f"lag_return_{i}")
-
-        for i in range(1, self.lag_days + 1):
-            feature_cols.append(f"lag_volume_{i}")
-
-        feature_cols.extend([
-            "daily_range",
-            "open_close_change",
-            "volume_change",
-        ])
-
-        return feature_cols
-
-    @staticmethod
-    def _safe_float(value, default=0.0):
-        try:
-            if value is None or pd.isna(value):
-                return default
-            return float(value)
-        except Exception:
-            return default
-
-    @staticmethod
-    def _coerce_date(value):
-        if value in (None, ""):
-            return None
-        try:
-            return pd.Timestamp(value).date()
-        except Exception:
-            return None
-
-    def _get_source_history(self):
-        if self.historical_df is not None:
-            hist_df = self.historical_df.copy()
-        else:
-            hist_df = YFinanceHelper.get_historical_prices(
-                self.ticker,
-                days=self.days,
-                exclude_today=True,
-            )
-
-        if hist_df is None or hist_df.empty:
-            logger.error("Data historis kosong untuk %s", self.ticker)
-            return None
-
-        hist_df = hist_df.copy()
-        hist_df = hist_df.sort_index()
-
-        if self.cutoff_date is not None:
-            hist_df = hist_df[hist_df.index.date <= self.cutoff_date]
-
-        if self.days and len(hist_df) > self.days:
-            hist_df = hist_df.tail(self.days)
-
-        if hist_df.empty:
-            logger.error("Data historis kosong setelah filtering cutoff untuk %s", self.ticker)
-            return None
-
-        required_cols = {"Open", "High", "Low", "Close", "Volume"}
-        missing_cols = required_cols - set(hist_df.columns)
-        if missing_cols:
-            logger.error(
-                "Kolom historis tidak lengkap untuk %s. Missing: %s",
-                self.ticker,
-                ", ".join(sorted(missing_cols)),
-            )
-            return None
-
-        return hist_df
-
-    def prepare_price_dataset(self):
-        hist_df = self._get_source_history()
-        if hist_df is None or hist_df.empty:
-            return None
-
-        if "Close" not in hist_df.columns:
-            logger.error("Kolom Close tidak ditemukan untuk %s", self.ticker)
-            return None
-
-        self.latest_completed_close = {
-            "date": hist_df.index[-1].strftime("%Y-%m-%d"),
-            "close": float(hist_df.iloc[-1]["Close"]),
-        }
-
-        df = hist_df[["Open", "High", "Low", "Close", "Volume"]].copy()
-        df.columns = ["open", "high", "low", "close", "volume"]
-
-        df["open"] = pd.to_numeric(df["open"], errors="coerce")
-        df["high"] = pd.to_numeric(df["high"], errors="coerce")
-        df["low"] = pd.to_numeric(df["low"], errors="coerce")
-        df["close"] = pd.to_numeric(df["close"], errors="coerce")
-        df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-
-        # Fitur tambahan non-teknikal berbasis data pasar mentah
-        df["return"] = df["close"].pct_change()
-        df["daily_range"] = np.where(
-            np.abs(df["close"]) < 1e-8,
-            0.0,
-            (df["high"] - df["low"]) / df["close"],
-        )
-        df["open_close_change"] = np.where(
-            np.abs(df["open"]) < 1e-8,
-            0.0,
-            (df["close"] - df["open"]) / df["open"],
-        )
-        df["volume_change"] = df["volume"].pct_change()
-
-        # Lag close
-        for i in range(1, self.lag_days + 1):
-            df[f"lag_close_{i}"] = df["close"].shift(i)
-
-        # Lag return
-        for i in range(1, self.lag_days + 1):
-            df[f"lag_return_{i}"] = df["return"].shift(i)
-
-        # Lag volume
-        for i in range(1, self.lag_days + 1):
-            df[f"lag_volume_{i}"] = df["volume"].shift(i)
-
-        # Target return 1 hari/trading day ke depan
-        df["target_return_future"] = (
-            df["close"].shift(-self.forecast_horizon) - df["close"]
-        ) / df["close"]
-
-        df = df.replace([np.inf, -np.inf], np.nan).dropna().copy()
-
-        if len(df) < 120:
-            logger.error(
-                "Dataset harga terlalu sedikit setelah preprocessing untuk %s",
-                self.ticker,
-            )
-            return None
-
-        return df
-
-    def _time_series_split(self, df, train_ratio=0.8):
-        split_idx = int(len(df) * train_ratio)
-
-        train_df = df.iloc[:split_idx].copy()
-        test_df = df.iloc[split_idx:].copy()
-
-        if len(train_df) < 60 or len(test_df) < 20:
-            logger.error("Ukuran train/test tidak memadai untuk %s", self.ticker)
-            return None, None
-
-        return train_df, test_df
-
-    @staticmethod
-    def _calculate_mape(actual_prices, predicted_prices):
-        actual_safe = np.where(np.abs(actual_prices) < 1e-8, 1e-8, actual_prices)
-        return float(np.mean(np.abs((actual_prices - predicted_prices) / actual_safe)) * 100)
+        # Daftar fitur harga (diambil dari trainer)
+        self.price_feature_columns = self.trainer.feature_columns
 
     def train_price_model(self):
-        df = self.prepare_price_dataset()
-        if df is None or df.empty:
+        """
+        Melatih model harga saham
+
+        Flow:
+        1. Jalankan trainer.fit()
+        2. Ambil hasil training (dataset, metrics, dll)
+        """
+
+        # Jalankan proses training
+        success = self.trainer.fit()
+
+        # Jika gagal training
+        if not success:
             return False
 
-        train_df, test_df = self._time_series_split(df)
-        if train_df is None or test_df is None:
-            return False
-
-        X_train = train_df[self.price_feature_columns].values
-        y_train = train_df["target_return_future"].values
-
-        X_test = test_df[self.price_feature_columns].values
-        y_test_return = test_df["target_return_future"].values
-
-        X_train_scaled = self.scaler.fit_transform(X_train)
-        X_test_scaled = self.scaler.transform(X_test)
-
-        self.rf_model.fit(X_train_scaled, y_train)
-        self.lr_model.fit(X_train_scaled, y_train)
-
-        rf_pred_return = self.rf_model.predict(X_test_scaled)
-        lr_pred_return = self.lr_model.predict(X_test_scaled)
-
-        current_close_test = test_df["close"].values
-        y_test_price = current_close_test * (1 + y_test_return)
-        rf_pred_price = current_close_test * (1 + rf_pred_return)
-        lr_pred_price = current_close_test * (1 + lr_pred_return)
-
-        # RMSE tetap dipakai internal untuk penentuan bobot ensemble,
-        # tetapi tidak diekspos lagi sebagai metrik akurasi sistem.
-        rf_rmse_internal = float(np.sqrt(mean_squared_error(y_test_price, rf_pred_price)))
-        lr_rmse_internal = float(np.sqrt(mean_squared_error(y_test_price, lr_pred_price)))
-
-        eps = 1e-8
-        inv_rf = 1.0 / max(rf_rmse_internal, eps)
-        inv_lr = 1.0 / max(lr_rmse_internal, eps)
-        weight_sum = inv_rf + inv_lr
-
-        rf_weight = inv_rf / weight_sum
-        lr_weight = inv_lr / weight_sum
-
-        ensemble_pred_price = (rf_pred_price * rf_weight) + (lr_pred_price * lr_weight)
-        mape = self._calculate_mape(y_test_price, ensemble_pred_price)
-
-        self.dataset = df
-        self.ensemble_weights = {
-            "rf": float(round(rf_weight, 4)),
-            "lr": float(round(lr_weight, 4)),
-        }
-        self.metrics = {
-            "mape": mape,
-            "train_size": int(len(train_df)),
-            "test_size": int(len(test_df)),
-        }
+        # Simpan hasil training ke wrapper
+        self.dataset = self.trainer.dataset
+        self.latest_completed_close = self.trainer.latest_completed_close
+        self.metrics = self.trainer.metrics
+        self.ensemble_weights = self.trainer.ensemble_weights
 
         return True
 
-    def _get_fundamentals(self):
-        if self.fundamentals is not None:
-            return self.fundamentals
-
-        fundamentals = YFinanceHelper.get_fundamentals(self.ticker) or {}
-        self.fundamentals = fundamentals
-        return fundamentals
-
-    def _predict_fundamental_return(self, current_price):
-        fundamentals = self._get_fundamentals()
-
-        eps = self._safe_float(fundamentals.get("eps"))
-        roe = self._safe_float(fundamentals.get("roe"))
-        pbv = self._safe_float(fundamentals.get("pbv"))
-        pe = self._safe_float(fundamentals.get("pe"))
-
-        score = 0.0
-
-        if eps > 0:
-            score += 1.0
-        elif eps < 0:
-            score -= 1.0
-
-        if roe >= 15:
-            score += 1.5
-        elif roe >= 8:
-            score += 0.5
-        elif roe < 0:
-            score -= 1.0
-
-        if 0 < pbv < 1:
-            score += 1.0
-        elif 1 <= pbv <= 3:
-            score += 0.3
-        elif pbv > 5:
-            score -= 0.8
-
-        if 0 < pe < 12:
-            score += 1.0
-        elif 12 <= pe <= 20:
-            score += 0.4
-        elif pe > 30:
-            score -= 1.0
-        elif pe <= 0:
-            score -= 0.5
-
-        estimated_return_pct = max(min(score * 5.0, 15.0), -15.0)
-        direction = "Naik" if estimated_return_pct >= 0 else "Turun"
-
-        recommendation = "HOLD"
-        if estimated_return_pct >= 5:
-            recommendation = "BUY"
-        elif estimated_return_pct <= -5:
-            recommendation = "SELL"
-
-        implied_price = current_price * (1 + estimated_return_pct / 100.0)
-
-        return {
-            "estimated_return_pct_3m": float(round(estimated_return_pct, 2)),
-            "direction_3m": direction,
-            "recommendation": recommendation,
-            "implied_fair_price_3m": float(round(implied_price, 2)),
-            "fundamental_inputs": {
-                "eps": float(round(eps, 4)),
-                "roe": float(round(roe, 4)),
-                "pbv": float(round(pbv, 4)),
-                "pe": float(round(pe, 4)),
-            },
-            "explanation": (
-                "Return 3 bulan, arah, dan rekomendasi dihitung dari "
-                "sinyal fundamental; bukan dari model harga time-series."
-            ),
-        }
-
     def predict_next_period(self):
-        if self.dataset is None and not self.train_price_model():
-            return None
+        """
+        Melakukan prediksi harga periode berikutnya
 
-        if not self.latest_completed_close:
-            logger.error("Latest completed close tidak tersedia untuk %s", self.ticker)
-            return None
+        Flow:
+        1. Jika belum training → lakukan training dulu
+        2. Set service dengan hasil training
+        3. Jalankan prediksi
+        """
 
-        current_price = float(self.latest_completed_close["close"])
+        # Jika belum ada dataset (belum training)
+        if self.dataset is None:
+            trained = self.train_price_model()
 
-        latest_features_row = self.dataset.iloc[-1]
-        X_latest = latest_features_row[self.price_feature_columns].to_frame().T.values
-        X_latest_scaled = self.scaler.transform(X_latest)
+            # Jika training gagal → return None
+            if not trained:
+                return None
 
-        rf_pred_return = float(self.rf_model.predict(X_latest_scaled)[0])
-        lr_pred_return = float(self.lr_model.predict(X_latest_scaled)[0])
+        # Inject hasil training ke service inference
+        self.service.trainer = self.trainer
 
-        rf_pred_price = current_price * (1 + rf_pred_return)
-        lr_pred_price = current_price * (1 + lr_pred_return)
+        # Artifact = bundle model + config + scaler
+        self.service.artifact = self.trainer.build_artifact()
 
-        predicted_close = (
-            (rf_pred_price * self.ensemble_weights["rf"]) +
-            (lr_pred_price * self.ensemble_weights["lr"])
-        )
+        # Dataset hasil preprocessing
+        self.service.dataset = self.trainer.dataset
 
-        price_change_pct = (
-            ((predicted_close - current_price) / current_price) * 100
-            if current_price else 0.0
-        )
+        # Harga terakhir
+        self.service.latest_completed_close = self.trainer.latest_completed_close
 
-        price_recommendation = "HOLD"
-        if price_change_pct >= 3:
-            price_recommendation = "BUY"
-        elif price_change_pct <= -3:
-            price_recommendation = "SELL"
-
-        fundamental_view = self._predict_fundamental_return(current_price)
-
-        return {
-            "ticker": self.ticker,
-            "prediction_horizon_days": self.forecast_horizon,
-            "predicted_close_next_day": float(round(predicted_close, 2)),
-            "rf_prediction": float(round(rf_pred_price, 2)),
-            "lr_prediction": float(round(lr_pred_price, 2)),
-            "ensemble_weights": self.ensemble_weights,
-            "current_price": float(round(current_price, 2)),
-            "current_price_date": self.latest_completed_close["date"],
-            "price_expected_change_pct": float(round(price_change_pct, 2)),
-            "price_recommendation": price_recommendation,
-            "mape": float(round(self.metrics["mape"], 4)),
-            "fundamental_prediction": fundamental_view,
-            "prediction_date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "features_used": {
-                "price_model": {
-                    "model": ["Random Forest", "Linear Regression"],
-                    "features": self.price_feature_columns,
-                    "target": f"return {self.forecast_horizon} trading day ahead",
-                },
-                "fundamental_model": {
-                    "type": "rule-based fundamental scoring",
-                    "features": ["EPS", "ROE", "PBV", "PER"],
-                    "target": "estimated return 3 months, direction, recommendation",
-                },
-            },
-            "validation": {
-                "train_size": self.metrics["train_size"],
-                "test_size": self.metrics["test_size"],
-                "evaluation_method": "time-series holdout split",
-                "price_metric_basis": "predicted return converted back to price",
-                "accuracy_metric": "MAPE",
-            },
-        }
-
-
-def predict_stock_price(ticker):
-    try:
-        predictor = StockPricePredictor(
-            ticker=ticker,
-            forecast_horizon=1,
-            lag_days=15,
-        )
-        if not predictor.train_price_model():
-            return None
-        return predictor.predict_next_period()
-    except Exception as e:
-        logger.error("Error in predict_stock_price for %s: %s", ticker, str(e))
-        return None
+        # Jalankan prediksi
+        return self.service.predict()

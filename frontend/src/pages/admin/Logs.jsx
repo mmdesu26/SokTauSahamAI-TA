@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Download, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { useAppAlert } from "@/components/AppAlertContext";
+import { useAppAlert } from "@/components/AppAlert";
 
 export default function AdminLogs() {
   const { showError } = useAppAlert();
@@ -15,14 +15,14 @@ export default function AdminLogs() {
 
   const LIMIT = 50;
 
-  const fetchLogs = async (offsetVal = 0) => {
+  const fetchLogs = async (offsetVal = 0, sourceQuery = searchQuery) => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
         limit: LIMIT,
         offset: offsetVal,
         ...(filterLevel !== "all" && { level: filterLevel }),
-        ...(searchQuery && { source: searchQuery }),
+        ...(sourceQuery && { source: sourceQuery }),
       });
 
       const { ok, data } = await apiFetch(`/admin/logs?${params}`);
@@ -49,32 +49,32 @@ export default function AdminLogs() {
   const handleSearch = (e) => {
     const query = e.target.value;
     setSearchQuery(query);
-    fetchLogs(0);
+    fetchLogs(0, query);
   };
 
   const filteredLogs = logs;
 
   const getLevelColors = (level) => {
     const colors = {
-      info: "border-[var(--color-admin4)] bg-[var(--color-admin)]/15 text-[var(--color-admin)]",
+      info: "border-[var(--color-admin)]/20 bg-[var(--color-admin)]/15 text-[var(--color-admin)]",
       warning:
-        "border-[var(--color-admin4)] bg-[var(--color-admin2)]/25 text-[#5f4b32]",
-      error: "border-red-200 bg-red-100 text-red-700",
+        "border-amber-500/20 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+      error: "border-red-500/20 bg-red-500/15 text-red-700 dark:text-red-300",
       success:
-        "border-[var(--color-admin4)] bg-[var(--color-admin4)]/35 text-[#5f4b32]",
+        "border-emerald-500/20 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
     };
 
     return (
       colors[level] ||
-      "border-[var(--color-admin4)] bg-[var(--color-admin3)] text-[#222222]"
+      "border-border bg-muted text-foreground"
     );
   };
 
   const getBorderColor = (level) => {
     const colors = {
       error: "border-red-400",
-      warning: "border-[var(--color-admin2)]",
-      success: "border-[var(--color-admin4)]",
+      warning: "border-amber-500",
+      success: "border-emerald-500",
       info: "border-[var(--color-admin)]",
     };
 
@@ -82,40 +82,40 @@ export default function AdminLogs() {
   };
 
   function formatLogTimestamp(value) {
-  if (!value) return "-";
+    if (!value) return "-";
 
-  const raw = String(value).trim();
+    const raw = String(value).trim();
 
-  // backend kirim naive datetime: "2026-04-01 00:18:37"
-  // dipaksa anggap itu UTC
-  const normalized = raw.includes("T")
-    ? raw.replace(" ", "")
-    : raw.replace(" ", "T");
+    // backend kirim naive datetime: "2026-04-01 00:18:37"
+    // dipaksa anggap itu UTC
+    const normalized = raw.includes("T")
+      ? raw.replace(" ", "")
+      : raw.replace(" ", "T");
 
-  const utcValue = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
-  const date = new Date(utcValue);
+    const utcValue = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
+    const date = new Date(utcValue);
 
-  if (Number.isNaN(date.getTime())) return value;
+    if (Number.isNaN(date.getTime())) return value;
 
-  return `${new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZone: "Asia/Jakarta",
-  }).format(date)} WIB`;
+    return `${new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Asia/Jakarta",
+    }).format(date)} WIB`;
   }
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-10 pb-16">
       {/* Header */}
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
+      <section className="rounded-3xl border border-border bg-card p-8 shadow-sm md:p-12">
+        <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
           Log & Monitoring
         </h1>
-        <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
+        <p className="max-w-3xl text-lg text-muted-foreground md:text-xl">
           Monitor semua aktivitas sistem, error, dan status operasi secara
           real-time.
         </p>
@@ -124,20 +124,25 @@ export default function AdminLogs() {
       {/* Search + Action */}
       <section className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative min-w-[280px] flex-1">
-          <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-[#666666]" />
+          <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             placeholder="Cari sumber aktivitas (CRUD Stock, Prediction, Auth, dll)..."
             value={searchQuery}
             onChange={handleSearch}
-            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-4 pl-12 text-[#222222] placeholder-[#666666] shadow-sm transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+            className="w-full rounded-xl border border-input bg-background py-3 pr-4 pl-12 text-foreground placeholder:text-muted-foreground shadow-sm transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
           />
         </div>
 
         <div className="flex gap-2">
           <button
             onClick={() => {
-              const csv = logs.map(log => `"${log.timestamp}","${log.level}","${log.source}","${log.message}","${log.username}"`).join("\n");
+              const csv = logs
+                .map(
+                  (log) =>
+                    `"${log.timestamp}","${log.level}","${log.source}","${log.message}","${log.username}"`
+                )
+                .join("\n");
               const blob = new Blob([csv], { type: "text/csv" });
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement("a");
@@ -145,7 +150,7 @@ export default function AdminLogs() {
               a.download = "logs.csv";
               a.click();
             }}
-            className="flex items-center gap-2 rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 font-medium text-[#222222] shadow-sm transition hover:bg-[var(--color-admin3)]"
+            className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 font-medium text-foreground shadow-sm transition hover:bg-muted"
           >
             <Download className="h-4 w-4 text-[var(--color-admin)]" />
             Export
@@ -162,7 +167,7 @@ export default function AdminLogs() {
             className={`rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition ${
               filterLevel === level
                 ? "bg-[var(--color-admin)] text-white"
-                : "border border-[var(--color-admin4)] bg-white text-[#222222] hover:bg-[var(--color-admin3)]"
+                : "border border-border bg-background text-foreground hover:bg-muted"
             }`}
           >
             {level === "all"
@@ -173,20 +178,20 @@ export default function AdminLogs() {
       </section>
 
       {/* Logs */}
-      <section className="overflow-hidden rounded-3xl border border-[var(--color-admin4)] bg-white shadow-sm">
+      <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         {isLoading ? (
           <div className="py-12 text-center">
-            <p className="text-lg text-[#666666]">Memuat log...</p>
+            <p className="text-lg text-muted-foreground">Memuat log...</p>
           </div>
         ) : filteredLogs.length > 0 ? (
-          <div className="divide-y divide-[var(--color-admin4)]/70">
+          <div className="divide-y divide-border/70">
             {filteredLogs.map((log) => (
               <div key={log.id} className={`border-l-4 ${getBorderColor(log.level)}`}>
                 <button
                   onClick={() =>
                     setExpandedLog(expandedLog === log.id ? null : log.id)
                   }
-                  className="w-full px-6 py-5 text-left transition hover:bg-[var(--color-admin3)]/60"
+                  className="w-full px-6 py-5 text-left transition hover:bg-muted/50"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex flex-1 items-start gap-4">
@@ -199,8 +204,10 @@ export default function AdminLogs() {
                       </span>
 
                       <div className="flex-1">
-                        <p className="font-medium text-[#222222]">{log.message}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[#666666]">
+                        <p className="font-medium text-foreground">
+                          {log.message}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span>{log.source}</span>
                           <span>•</span>
                           <span>{log.username || "system"}</span>
@@ -209,8 +216,8 @@ export default function AdminLogs() {
                         </div>
 
                         {expandedLog === log.id && log.details && (
-                          <div className="mt-4 rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)]/70 p-4">
-                            <p className="font-mono text-xs whitespace-pre-wrap text-[#555555]">
+                          <div className="mt-4 rounded-xl border border-border bg-muted/60 p-4">
+                            <p className="font-mono whitespace-pre-wrap text-xs text-muted-foreground">
                               {log.details}
                             </p>
                           </div>
@@ -224,7 +231,7 @@ export default function AdminLogs() {
           </div>
         ) : (
           <div className="py-12 text-center">
-            <p className="text-lg text-[#666666]">
+            <p className="text-lg text-muted-foreground">
               Tidak ada log yang sesuai dengan filter
             </p>
           </div>
@@ -234,21 +241,22 @@ export default function AdminLogs() {
       {/* Pagination */}
       {total > LIMIT && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-[#666666]">
-            Menampilkan {offset + 1} - {Math.min(offset + LIMIT, total)} dari {total} log
+          <p className="text-sm text-muted-foreground">
+            Menampilkan {offset + 1} - {Math.min(offset + LIMIT, total)} dari{" "}
+            {total} log
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => fetchLogs(Math.max(0, offset - LIMIT))}
               disabled={offset === 0}
-              className="rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-2 text-sm font-medium text-[#222222] transition hover:bg-[var(--color-admin3)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               Sebelumnya
             </button>
             <button
               onClick={() => fetchLogs(offset + LIMIT)}
               disabled={offset + LIMIT >= total}
-              className="rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-2 text-sm font-medium text-[#222222] transition hover:bg-[var(--color-admin3)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
             >
               Berikutnya
             </button>

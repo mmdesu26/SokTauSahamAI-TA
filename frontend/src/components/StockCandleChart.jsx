@@ -56,6 +56,12 @@ function formatAxisLabel(time, timeframe = "1D") {
   return String(time || "");
 }
 
+function formatPrice(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "0";
+  return Math.round(num).toLocaleString("id-ID");
+}
+
 export default function StockCandleChart({ data = [], timeframe = "1D" }) {
   const containerRef = useRef(null);
 
@@ -83,6 +89,7 @@ export default function StockCandleChart({ data = [], timeframe = "1D" }) {
       localization: {
         locale: "id-ID",
         timeFormatter: (time) => formatAxisLabel(time, timeframe),
+        priceFormatter: (price) => formatPrice(price),
       },
       rightPriceScale: {
         borderColor: "rgba(148,163,184,0.2)",
@@ -98,6 +105,11 @@ export default function StockCandleChart({ data = [], timeframe = "1D" }) {
       borderVisible: false,
       wickUpColor: "#22c55e",
       wickDownColor: "#ef4444",
+      priceFormat: {
+        type: "price",
+        precision: 0,
+        minMove: 1,
+      },
     });
 
     const chartData = (Array.isArray(data) ? data : [])

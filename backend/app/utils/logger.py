@@ -1,14 +1,32 @@
-from app import db  # ambil koneksi database
-from app.models import SystemLog  # model tabel log
-from datetime import datetime  # buat ambil waktu sekarang
-import logging as python_logging  # logging bawaan python (buat backup error)
-from datetime import timedelta  # buat hitung mundur waktu
+# Import koneksi database dari app
+from app import db
 
-logger = python_logging.getLogger(__name__)  # bikin logger biasa buat debug
+# Import model SystemLog (tabel untuk menyimpan log)
+from app.models import SystemLog
+
+# Import datetime untuk mendapatkan waktu sekarang (UTC)
+from datetime import datetime
+
+# Import logging bawaan Python (sebagai fallback jika DB gagal)
+import logging as python_logging
+
+# Import timedelta untuk menghitung waktu (misalnya 6 bulan lalu)
+from datetime import timedelta
+
+# Membuat logger Python biasa untuk debugging internal
+logger = python_logging.getLogger(__name__)
 
 
 class SystemLogger:
-    """pusat logging semua aktivitas sistem"""
+    """
+    Class utama untuk mencatat semua aktivitas sistem ke database.
+
+    Digunakan untuk:
+    - logging aktivitas user (login, CRUD)
+    - logging error sistem
+    - logging ML prediction
+    - audit trail (penting di sistem finansial)
+    """
 
     @staticmethod
     def log(
@@ -22,55 +40,89 @@ class SystemLogger:
         entity_id: int = None,
         ip_address: str = None,
     ):
+        """
+        Fungsi utama untuk menyimpan log ke database.
+
+        Parameter:
+        - level: jenis log (success, error, warning, info)
+        - source: asal log (Auth, ML, Stock, dll)
+        - message: pesan utama
+        - details: detail tambahan (biasanya error)
+        - user_id: ID user yang melakukan aksi
+        - action_type: jenis aksi (CREATE, DELETE, LOGIN, dll)
+        - entity_type: jenis data (Stock, User, dll)
+        - entity_id: ID data yang terkait
+        - ip_address: IP user
+        """
         try:
-            # bikin object log baru
+            # Membuat object log baru
             log = SystemLog(
                 timestamp=datetime.utcnow(),  # waktu sekarang (UTC)
-                level=level,  # level log (success, error, dll)
-                source=source,  # dari mana (misal: auth, ML)
-                message=message,  # isi pesan
-                details=details,  # detail tambahan (biasanya error)
-                user_id=user_id,  # id user yg melakukan
-                action_type=action_type,  # aksi (create, delete, dll)
-                entity_type=entity_type,  # jenis data (stock, user, dll)
-                entity_id=entity_id,  # id data
-                ip_address=ip_address,  # ip user
+                level=level,
+                source=source,
+                message=message,
+                details=details,
+                user_id=user_id,
+                action_type=action_type,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                ip_address=ip_address,
             )
 
-            db.session.add(log)  # masukin ke DB
-            db.session.commit()  # simpan permanen
-            return log  # balikin hasil
+            # Simpan ke database
+            db.session.add(log)
+            db.session.commit()
+
+            return log
 
         except Exception as e:
-            logger.error(f"Failed to log: {str(e)}")  # tampil error di console
+            # Jika gagal simpan ke DB, log ke console
+            logger.error(f"Failed to log: {str(e)}")
+
+            # Rollback agar DB tetap aman
             try:
-                db.session.rollback()  # batalin biar DB aman
+                db.session.rollback()
             except Exception:
                 pass
-            return None  # kalau gagal
 
-    # shortcut biar gak nulis panjang
+            return None
+
+    # =========================
+    # Shortcut Methods
+    # =========================
+
     @staticmethod
     def success(source: str, message: str, **kwargs):
+        """Shortcut untuk log success"""
         return SystemLogger.log(level="success", source=source, message=message, **kwargs)
 
     @staticmethod
     def error(source: str, message: str, details: str = None, **kwargs):
+        """Shortcut untuk log error"""
         return SystemLogger.log(level="error", source=source, message=message, details=details, **kwargs)
 
     @staticmethod
     def warning(source: str, message: str, details: str = None, **kwargs):
+        """Shortcut untuk log warning"""
         return SystemLogger.log(level="warning", source=source, message=message, details=details, **kwargs)
 
     @staticmethod
     def info(source: str, message: str, **kwargs):
+        """Shortcut untuk log info"""
         return SystemLogger.log(level="info", source=source, message=message, **kwargs)
 
 
-# log buat CRUD saham
-def log_stock_crud(action: str, stock_id: int, ticker: str, user_id: int = None, error: str = None, ip_address: str = None):
+# =========================
+# LOG KHUSUS (DOMAIN-BASED)
+# =========================
+
+def log_stock_crud(action: str, stock_id: int, ticker: str,
+                   user_id: int = None, error: str = None, ip_address: str = None):
+    """
+    Logging untuk operasi CRUD saham (CREATE, UPDATE, DELETE)
+    """
     if error:
-        # kalau gagal
+        # Jika gagal
         SystemLogger.error(
             source="Stock Management",
             message=f"Gagal {action.lower()} saham {ticker}",
@@ -82,7 +134,7 @@ def log_stock_crud(action: str, stock_id: int, ticker: str, user_id: int = None,
             ip_address=ip_address,
         )
     else:
-        # kalau berhasil
+        # Jika berhasil
         SystemLogger.success(
             source="Stock Management",
             message=f"Saham {ticker} berhasil {action.lower()}",
@@ -94,10 +146,15 @@ def log_stock_crud(action: str, stock_id: int, ticker: str, user_id: int = None,
         )
 
 
-# log buat hasil prediksi ML
-def log_prediction(ticker: str, success: bool, error_msg: str = None, mape: float = None, user_id: int = None, ip_address: str = None):
+def log_prediction(ticker: str, success: bool,
+                   error_msg: str = None, mape: float = None,
+                   user_id: int = None, ip_address: str = None):
+    """
+    Logging untuk hasil prediksi Machine Learning
+    """
     if success:
         suffix = f" (MAPE: {mape:.2f}%)" if mape is not None else ""
+
         SystemLogger.success(
             source="ML Prediction",
             message=f"Prediksi berhasil dibuat untuk {ticker}{suffix}",
@@ -118,8 +175,12 @@ def log_prediction(ticker: str, success: bool, error_msg: str = None, mape: floa
         )
 
 
-# log buat login/logout user
-def log_auth(action: str, username: str, user_id: int = None, success: bool = True, error_msg: str = None, ip_address: str = None):
+def log_auth(action: str, username: str,
+             user_id: int = None, success: bool = True,
+             error_msg: str = None, ip_address: str = None):
+    """
+    Logging untuk autentikasi (LOGIN, LOGOUT, PASSWORD_CHANGE)
+    """
     if success:
         SystemLogger.success(
             source="Authentication",
@@ -142,8 +203,11 @@ def log_auth(action: str, username: str, user_id: int = None, success: bool = Tr
         )
 
 
-# log buat glosarium
-def log_glossary(action: str, term: str, user_id: int = None, error: str = None, ip_address: str = None):
+def log_glossary(action: str, term: str,
+                 user_id: int = None, error: str = None, ip_address: str = None):
+    """
+    Logging untuk CRUD glosarium
+    """
     if error:
         SystemLogger.error(
             source="Glossary Management",
@@ -165,9 +229,14 @@ def log_glossary(action: str, term: str, user_id: int = None, error: str = None,
         )
 
 
-# log buat API / service luar
-def log_external_service(source: str, message: str, details: str = None, success: bool = False, user_id: int = None, ip_address: str = None):
-    fn = SystemLogger.success if success else SystemLogger.error  # pilih otomatis success/error
+def log_external_service(source: str, message: str,
+                         details: str = None, success: bool = False,
+                         user_id: int = None, ip_address: str = None):
+    """
+    Logging untuk API/service eksternal (misal: Yahoo Finance)
+    """
+    fn = SystemLogger.success if success else SystemLogger.error
+
     return fn(
         source=source,
         message=message,
@@ -178,28 +247,45 @@ def log_external_service(source: str, message: str, details: str = None, success
         ip_address=ip_address,
     )
 
-# auto hapus log lama (lebih dari 6 bulan)
+
+# =========================
+# CLEANUP LOG
+# =========================
+
 def cleanup_old_logs():
+    """
+    Menghapus log lama (> 6 bulan)
+    Berguna untuk:
+    - menghemat storage
+    - menjaga performa database
+    """
     try:
-        # hitung batas waktu (6 bulan kebelakang)
+        # Hitung batas waktu (6 bulan lalu)
         six_months_ago = datetime.utcnow() - timedelta(days=180)
 
-        # ambil log yg lebih lama dari 6 bulan
+        # Ambil log lama
         old_logs = SystemLog.query.filter(SystemLog.timestamp < six_months_ago)
 
-        deleted_count = old_logs.count()  # jumlah yg mau dihapus
+        # Hitung jumlah yang akan dihapus
+        deleted_count = old_logs.count()
 
-        old_logs.delete()  # hapus semua
-        db.session.commit()  # simpan perubahan
+        # Hapus semua log lama
+        old_logs.delete()
 
-        logger.info(f"Cleanup log: {deleted_count} data lama dihapus")  # log hasil
+        # Commit perubahan
+        db.session.commit()
+
+        # Log hasil cleanup
+        logger.info(f"Cleanup log: {deleted_count} data lama dihapus")
 
         return deleted_count
 
     except Exception as e:
         logger.error(f"Gagal cleanup log: {str(e)}")
+
         try:
-            db.session.rollback()  # rollback kalau error
+            db.session.rollback()
         except Exception:
             pass
+
         return 0

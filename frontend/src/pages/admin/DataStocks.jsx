@@ -8,7 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { useAppAlert } from "@/components/AppAlertContext";
+import { useAppAlert } from "@/components/AppAlert";
 
 const INITIAL_FORM = {
   ticker: "",
@@ -121,10 +121,7 @@ export default function AdminDataStocks() {
 
   const handleSave = async () => {
     if (!formData.ticker.trim()) {
-      showError(
-        "Format: BBCA atau BBCA.JK (Ticker saham)",
-        "Gagal"
-      );
+      showError("Format: BBCA atau BBCA.JK (Ticker saham)", "Gagal");
       return;
     }
 
@@ -154,7 +151,8 @@ export default function AdminDataStocks() {
 
       if (ok && data?.success) {
         showSuccess(
-          data.message || "Data saham berhasil disimpan. Informasi lain diambil dari yfinance.",
+          data.message ||
+            "Data saham berhasil disimpan. Informasi lain diambil dari yfinance.",
           "Berhasil"
         );
         handleCloseModal();
@@ -169,31 +167,32 @@ export default function AdminDataStocks() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
+      <section className="rounded-3xl border border-border bg-card p-8 shadow-sm md:p-12">
+        <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
           Manajemen Data Saham
         </h1>
-        <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
-          Kelola data master saham dengan Create, Read, Update, dan Delete untuk saham yang ditampilkan pada halaman user.
+        <p className="max-w-3xl text-lg text-muted-foreground md:text-xl">
+          Kelola data master saham dengan Create, Read, Update, dan Delete untuk
+          saham yang ditampilkan pada halaman user.
         </p>
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="relative mx-auto min-w-[260px] max-w-md flex-1">
-          <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-[#666666]" />
+          <Search className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
             placeholder="Cari ticker atau nama saham..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pr-4 pl-12 text-[#222222] placeholder-[#666666] shadow-sm transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+            className="w-full rounded-xl border border-input bg-background py-3 pr-4 pl-12 text-foreground placeholder:text-muted-foreground shadow-sm transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
           />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handleOpenModal("add")}
-            className="flex items-center gap-2 rounded-xl bg-[var(--color-admin)] px-4 py-3 font-medium text-white shadow-sm transition hover:bg-[var(--color-admin2)] hover:text-[#222222]"
+            className="flex items-center gap-2 rounded-xl bg-[var(--color-admin)] px-4 py-3 font-medium text-white shadow-sm transition hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
             Tambah Saham
@@ -201,33 +200,33 @@ export default function AdminDataStocks() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-[var(--color-admin4)] bg-white shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-max">
             <thead>
-              <tr className="border-b border-[var(--color-admin4)] bg-[var(--color-admin3)]/70">
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+              <tr className="border-b border-border bg-muted/60">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Ticker
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Nama Perusahaan
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Sektor
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Harga
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Perubahan
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Terakhir Diubah
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Status
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-[#222222]">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">
                   Aksi
                 </th>
               </tr>
@@ -238,7 +237,7 @@ export default function AdminDataStocks() {
                 <tr>
                   <td
                     colSpan={9}
-                    className="px-6 py-10 text-center text-[#666666]"
+                    className="px-6 py-10 text-center text-muted-foreground"
                   >
                     Memuat data saham...
                   </td>
@@ -247,30 +246,30 @@ export default function AdminDataStocks() {
                 filtered.map((stock) => (
                   <tr
                     key={stock.id}
-                    className="border-b border-[var(--color-admin4)]/60 transition hover:bg-[var(--color-admin3)]/60"
+                    className="border-b border-border/60 transition hover:bg-muted/50"
                   >
-                    <td className="px-6 py-4 font-semibold text-[#222222]">
+                    <td className="px-6 py-4 font-semibold text-foreground">
                       {stock.ticker}
                     </td>
-                    <td className="px-6 py-4 text-[#222222]">{stock.name}</td>
-                    <td className="px-6 py-4 text-[#666666]">
+                    <td className="px-6 py-4 text-foreground">{stock.name}</td>
+                    <td className="px-6 py-4 text-muted-foreground">
                       {stock.sector}
                     </td>
-                    <td className="px-6 py-4 text-[#222222]">
+                    <td className="px-6 py-4 text-foreground">
                       Rp {stock.price}
                     </td>
-                    <td className="px-6 py-4 text-[#666666]">
+                    <td className="px-6 py-4 text-muted-foreground">
                       {stock.change}
                     </td>
-                    <td className="px-6 py-4 text-sm text-[#666666]">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {stock.lastUpdated}
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-full border px-3 py-1 text-xs font-medium ${
                           stock.status === "Active"
-                            ? "border-[var(--color-admin4)] bg-[var(--color-admin)]/15 text-[var(--color-admin)]"
-                            : "border-[var(--color-admin4)] bg-[var(--color-admin4)]/30 text-[#666666]"
+                            ? "border-[var(--color-admin)]/20 bg-[var(--color-admin)]/15 text-[var(--color-admin)]"
+                            : "border-border bg-muted text-muted-foreground"
                         }`}
                       >
                         {stock.status}
@@ -302,7 +301,7 @@ export default function AdminDataStocks() {
                 <tr>
                   <td
                     colSpan={9}
-                    className="px-6 py-10 text-center text-[#666666]"
+                    className="px-6 py-10 text-center text-muted-foreground"
                   >
                     Tidak ada data saham yang ditemukan
                   </td>
@@ -314,24 +313,24 @@ export default function AdminDataStocks() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--color-admin4)] bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#222222]">
+              <h2 className="text-xl font-bold text-foreground">
                 {modalType === "add" ? "Tambah Saham Baru" : "Edit Saham"}
               </h2>
 
               <button
                 onClick={handleCloseModal}
-                className="rounded-lg p-1 transition hover:bg-[var(--color-admin3)]"
+                className="rounded-lg p-1 transition hover:bg-muted"
               >
-                <X className="h-6 w-6 text-[#666666] hover:text-[#222222]" />
+                <X className="h-6 w-6 text-muted-foreground hover:text-foreground" />
               </button>
             </div>
 
             <div className="space-y-5">
               <div>
-                <label className="mb-2 block text-sm font-medium text-[#222222]">
+                <label className="mb-2 block text-sm font-medium text-foreground">
                   Ticker (format: BBCA atau BBCA.JK)
                 </label>
                 <input
@@ -345,9 +344,9 @@ export default function AdminDataStocks() {
                   }
                   placeholder="Contoh: BBCA"
                   disabled={modalType === "edit"}
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20 disabled:bg-[var(--color-admin3)]/30 disabled:cursor-not-allowed"
+                  className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20 disabled:cursor-not-allowed disabled:bg-muted"
                 />
-                <p className="mt-1 text-xs text-[#666666]">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {modalType === "add"
                     ? "Data nama, sektor, dan harga akan diambil otomatis dari yfinance"
                     : "Ticker tidak bisa diubah. Edit hanya untuk mengubah status."}
@@ -362,7 +361,7 @@ export default function AdminDataStocks() {
                     status: e.target.value,
                   }))
                 }
-                className="w-full rounded-xl border border-[var(--color-admin4)] bg-white px-4 py-3 text-[#222222] transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+                className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
               >
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
@@ -372,14 +371,14 @@ export default function AdminDataStocks() {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={handleCloseModal}
-                className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white py-3 text-[#222222] transition hover:bg-[var(--color-admin3)]"
+                className="flex-1 rounded-xl border border-border bg-background py-3 text-foreground transition hover:bg-muted"
               >
                 Batal
               </button>
 
               <button
                 onClick={handleSave}
-                className="flex-1 rounded-xl bg-[var(--color-admin)] py-3 text-white transition hover:bg-[var(--color-admin2)] hover:text-[#222222]"
+                className="flex-1 rounded-xl bg-[var(--color-admin)] py-3 text-white transition hover:opacity-90"
               >
                 Simpan
               </button>
@@ -389,21 +388,21 @@ export default function AdminDataStocks() {
       )}
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--color-admin4)] bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl">
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100 dark:bg-red-500/15">
                 <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
 
-              <h3 className="text-lg font-semibold text-[#222222]">
+              <h3 className="text-lg font-semibold text-foreground">
                 Hapus Saham?
               </h3>
             </div>
 
-            <p className="mb-6 text-[#555555]">
+            <p className="mb-6 text-muted-foreground">
               Anda yakin ingin menghapus{" "}
-              <span className="font-semibold text-[#222222]">
+              <span className="font-semibold text-foreground">
                 {selectedStockName}
               </span>
               ?
@@ -412,7 +411,7 @@ export default function AdminDataStocks() {
             <div className="flex gap-3">
               <button
                 onClick={handleCloseDeleteModal}
-                className="flex-1 rounded-xl border border-[var(--color-admin4)] bg-white py-3 text-[#222222] transition hover:bg-[var(--color-admin3)]"
+                className="flex-1 rounded-xl border border-border bg-background py-3 text-foreground transition hover:bg-muted"
               >
                 Batal
               </button>

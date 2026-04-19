@@ -1,115 +1,139 @@
+// LOGIN ADMIN — pakai accent ADMIN (teal/emerald), bukan investor violet
+// Logic & endpoint sama persis dgn versi lama
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { TrendingUp, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Shield, Lock, Eye, EyeOff, User, AlertCircle, ArrowRight } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { setAdminSession, isAdminSessionActive } from "@/utils/authSession";
-
-import BoxesWrapper from "@/components/BoxesBg";
-import ShineBorderWrapper from "@/components/ShineBorder";
-import ShineForm from "@/components/ShineForm";
-import Button from "@/components/Button";
-import AppAlert from "@/components/AppAlert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ username: "", password: "" });
-  const [showPassword, setShowPassword] = useState(false);
-  const [alert, setAlert] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState({ username: "", password: "" });
+  const [showPwd, setShowPwd] = useState(false);
+  const [alert, setAlert] = useState(null); // {type, message}
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     document.title = "SokTauSaham Admin";
+    // kalau session masih aktif, langsung lempar ke dashboard
     if (isAdminSessionActive()) navigate("/admin/dashboard", { replace: true });
   }, [navigate]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const onChange = (e) => {
+    setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
     setAlert(null);
   };
 
-  const handleLogin = async (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setAlert(null);
 
-    const errors = [];
-    if (!formData.username.trim()) errors.push("Username wajib diisi.");
-    if (!formData.password.trim()) errors.push("Password wajib diisi.");
-
-    if (errors.length) {
-      setAlert({ type: "error", title: "Login Gagal", message: errors.join(" ") });
+    // validasi simpel di client
+    if (!form.username.trim() || !form.password.trim()) {
+      setAlert({ type: "error", message: "Username dan password wajib diisi." });
       return;
     }
 
-    setIsLoading(true);
+    setLoading(true);
     const { ok, data } = await apiFetch("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username: formData.username, password: formData.password }),
+      body: JSON.stringify({ username: form.username, password: form.password }),
     });
 
     if (ok && data.success) {
+      // simpen session admin
       setAdminSession(data.token, data.user, data.expiresInMinutes || 20);
-      setAlert({ type: "success", message: "Login berhasil sebagai admin!" });
-      setTimeout(() => navigate("/admin/dashboard", { replace: true }), 500);
+      setAlert({ type: "success", message: "Login berhasil!" });
+      setTimeout(() => navigate("/admin/dashboard", { replace: true }), 400);
     } else {
-      setAlert({ type: "error", title: "Login Gagal", message: data.message || "Username atau password salah." });
+      setAlert({ type: "error", message: data.message || "Username atau password salah." });
     }
-
-    setIsLoading(false);
+    setLoading(false);
   };
 
   return (
-    <BoxesWrapper className="flex items-center justify-center px-4">
-      <div className="absolute top-20 right-20 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
-      <div className="absolute bottom-20 left-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-12">
+      {/* glow background — pake admin token biar bedain dr investor */}
+      <div className="pointer-events-none absolute inset-0 bg-dotted opacity-40" />
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-admin/20 blur-3xl" />
 
-      <div className="relative mx-auto w-full max-w-md">
+      {/* theme toggle pojok kanan atas */}
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+
+      <div className="relative w-full max-w-md animate-fade-up">
+        {/* header brand */}
         <div className="mb-8 text-center">
-          <div className="mt-8 mb-5 inline-flex items-center justify-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <TrendingUp className="h-6 w-6 text-white" />
+          <div className="mb-4 inline-flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-admin shadow-soft">
+              <Shield className="h-5 w-5 text-admin-foreground" />
             </div>
-            <span className="text-xl font-bold text-bg-light">SokTauSaham Admin</span>
+            <span className="text-lg font-bold">SokTauSaham Admin</span>
           </div>
-          <h1 className="mb-2 text-3xl font-bold text-bg-light">Masuk ke Panel Admin</h1>
-          <p className="text-bg-light/70">Kelola data saham, glosarium, prediksi, dan monitoring sistem</p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Masuk ke Panel Admin</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Kelola data saham, glosarium, prediksi, dan monitoring sistem.
+          </p>
         </div>
 
-        <ShineBorderWrapper>
-          <ShineForm title="Login Admin" description="Masuk untuk mengakses panel admin SokTauSaham" className="mb-2 border border-primary/20 bg-primary-dark/60 backdrop-blur-sm">
-            {alert && (
-              <AppAlert type={alert.type} title={alert.title || (alert.type === "error" ? "Terjadi Kesalahan" : "Berhasil")} message={alert.message} autoHideMs={6000} onDismiss={() => setAlert(null)} />
-            )}
+        <Card className="p-6 sm:p-8">
+          {alert && (
+            <div className={cn(
+              "mb-5 flex items-start gap-2 rounded-xl border p-3 text-sm",
+              alert.type === "error"
+                ? "border-danger/30 bg-danger/10 text-danger"
+                : "border-success/30 bg-success/10 text-success"
+            )}>
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{alert.message}</span>
+            </div>
+          )}
 
-            <form onSubmit={handleLogin} className="mt-4 space-y-5">
-              <div>
-                <Label className="mb-2 block">Username</Label>
-                <div className="relative">
-                  <User className="pointer-events-none absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-bg-light/60" />
-                  <Input type="text" name="username" value={formData.username || ""} onChange={handleChange} placeholder="admin" className="border border-primary/25 bg-primary-dark/50 pl-10 text-bg-light" />
-                </div>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Username</label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="text" name="username"
+                  value={form.username} onChange={onChange}
+                  placeholder="admin" className="pl-9"
+                />
               </div>
+            </div>
 
-              <div>
-                <Label className="mb-2 block">Password</Label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 text-bg-light/60" />
-                  <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" className="border border-primary/25 bg-primary-dark/50 pl-10 pr-10 text-bg-light" />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute top-1/2 right-3 -translate-y-1/2 text-bg-light/70 hover:text-bg-light">
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Password</label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type={showPwd ? "text" : "password"} name="password"
+                  value={form.password} onChange={onChange}
+                  placeholder="••••••••" className="pl-9 pr-9"
+                />
+                <button
+                  type="button" onClick={() => setShowPwd((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Toggle password"
+                >
+                  {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
+            </div>
 
-              <Button type="submit" disabled={isLoading} className="mt-2 w-full justify-center">
-                {isLoading ? "Memproses..." : "Masuk ➜"}
-              </Button>
-            </form>
-          </ShineForm>
-        </ShineBorderWrapper>
+            {/* tombol pake variant admin biar warna match */}
+            <Button type="submit" variant="admin" size="lg" className="w-full" disabled={loading}>
+              {loading ? "Memproses..." : <>Masuk <ArrowRight className="h-4 w-4" /></>}
+            </Button>
+          </form>
+        </Card>
       </div>
-    </BoxesWrapper>
+    </div>
   );
 }

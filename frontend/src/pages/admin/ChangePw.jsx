@@ -1,260 +1,140 @@
+// CHANGE PASSWORD — logic & validasi sama persis dgn versi lama
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Lock, Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { useAppAlert } from "@/components/AppAlertContext";
+import { useAppAlert } from "@/components/AppAlert";
+import { Card } from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
 
 export default function ChangePassword() {
   const navigate = useNavigate();
   const { showSuccess, showError, showValidationError } = useAppAlert();
 
-  const [formData, setFormData] = useState({
-    oldPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
+  const [form, setForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConf, setShowConf] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [showOldPassword, setShowOldPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const reset = () => setForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  // validasi password baru — minimal 8 char + complexity
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    const errors = [];
+    if (!form.oldPassword.trim()) errors.push("Password lama wajib diisi.");
+    if (!form.newPassword.trim()) errors.push("Password baru wajib diisi.");
+    if (!form.confirmPassword.trim()) errors.push("Konfirmasi password wajib diisi.");
 
-  const resetForm = () => {
-    setFormData({
-      oldPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-  };
-
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  const errors = [];
-
-  if (!formData.oldPassword.trim()) {
-    errors.push("Password lama wajib diisi.");
-  }
-  if (!formData.newPassword.trim()) {
-    errors.push("Password baru wajib diisi.");
-  }
-  if (!formData.confirmPassword.trim()) {
-    errors.push("Konfirmasi password wajib diisi.");
-  }
-
-  // === VALIDASI BARU (8 karakter + complexity) ===
-  const pwd = formData.newPassword.trim();
-  if (pwd) {
-    if (pwd.length < 8) {
-      errors.push("Password baru minimal 8 karakter.");
+    const pwd = form.newPassword.trim();
+    if (pwd) {
+      if (pwd.length < 8) errors.push("Password baru minimal 8 karakter.");
+      if (!/[A-Z]/.test(pwd)) errors.push("Harus ada minimal 1 huruf besar.");
+      if (!/[a-z]/.test(pwd)) errors.push("Harus ada minimal 1 huruf kecil.");
+      if (!/\d/.test(pwd)) errors.push("Harus ada minimal 1 angka.");
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(pwd)) errors.push("Harus ada minimal 1 simbol.");
     }
-    if (!/[A-Z]/.test(pwd)) {
-      errors.push("Password baru harus mengandung minimal 1 huruf besar (A-Z).");
-    }
-    if (!/[a-z]/.test(pwd)) {
-      errors.push("Password baru harus mengandung minimal 1 huruf kecil (a-z).");
-    }
-    if (!/\d/.test(pwd)) {
-      errors.push("Password baru harus mengandung minimal 1 angka (0-9).");
-    }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/.test(pwd)) {
-      errors.push("Password baru harus mengandung minimal 1 simbol (!@#$%^&* dll).");
-    }
-  }
-
-    if (pwd && formData.confirmPassword.trim() && pwd !== formData.confirmPassword.trim()) {
-      errors.push("Password baru dan konfirmasi password tidak sama.");
+    if (pwd && form.confirmPassword.trim() && pwd !== form.confirmPassword.trim()) {
+      errors.push("Password baru dan konfirmasi tidak sama.");
     }
 
-    if (errors.length > 0) {
-      showValidationError(errors, "Validasi Gagal");
-      return;
-    }
+    if (errors.length) { showValidationError(errors); return; }
 
-    setIsLoading(true);
-
+    setLoading(true);
     const { ok, data } = await apiFetch("/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({
-        oldPassword: formData.oldPassword,
-        newPassword: formData.newPassword,
-        confirmPassword: formData.confirmPassword,
-      }),
+      body: JSON.stringify(form),
     });
 
     if (ok && data.success) {
-      resetForm();
-
-      showSuccess(
-        data.message ||
-          "Password berhasil diubah. Silakan login kembali dengan password baru.",
-        "Berhasil"
-      );
-
-      setTimeout(() => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        navigate("/admin/login", { replace: true });
-      }, 1200);
+      reset();
+      showSuccess(data.message || "Password berhasil diubah. Silakan login ulang.", "Berhasil");
+      setTimeout(() => navigate("/admin/login", { replace: true }), 1200);
     } else {
       showError(data.message || "Gagal mengubah password.", "Gagal");
     }
-
-    setIsLoading(false);
+    setLoading(false);
   };
 
+  // helper render input password — biar gak duplikat
+  const PwdField = ({ label, name, show, setShow, placeholder }) => (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium">{label}</label>
+      <div className="relative">
+        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type={show ? "text" : "password"}
+          name={name} value={form[name]} onChange={onChange}
+          placeholder={placeholder}
+          className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 pl-9 pr-9 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin focus-visible:border-admin/50"
+        />
+        <button
+          type="button" onClick={() => setShow((v) => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
-          Ubah Password
-        </h1>
-        <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
-          Perbarui password admin untuk menjaga keamanan akun dan akses panel administrasi.
+    <div className="space-y-8">
+      <header>
+        <Badge variant="admin" className="mb-2"><KeyRound className="h-3 w-3" /> Akun</Badge>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Ubah Password</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Perbarui password buat jaga keamanan akun admin.
         </p>
-      </section>
+      </header>
 
-      <section className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-        <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
-              <KeyRound className="h-5 w-5 text-[var(--color-admin)]" />
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
+        {/* form utama */}
+        <Card className="p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-admin-soft text-admin">
+              <KeyRound className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Form Ubah Password
-              </h2>
-              <p className="text-sm text-gray-600">
-                Pastikan password baru mudah diingat namun tetap kuat.
-              </p>
+              <h2 className="text-base font-semibold">Form Ubah Password</h2>
+              <p className="text-xs text-muted-foreground">Pastiin password baru kuat tapi gampang diingat.</p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Password Lama
-              </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showOldPassword ? "text" : "password"}
-                  name="oldPassword"
-                  value={formData.oldPassword}
-                  onChange={handleChange}
-                  placeholder="Masukkan password lama"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowOldPassword((prev) => !prev)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
-                >
-                  {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <PwdField label="Password Lama" name="oldPassword" show={showOld} setShow={setShowOld} placeholder="Password lama" />
+            <PwdField label="Password Baru" name="newPassword" show={showNew} setShow={setShowNew} placeholder="Password baru" />
+            <PwdField label="Konfirmasi Password Baru" name="confirmPassword" show={showConf} setShow={setShowConf} placeholder="Ulangi password baru" />
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Password Baru
-              </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showNewPassword ? "text" : "password"}
-                  name="newPassword"
-                  value={formData.newPassword}
-                  onChange={handleChange}
-                  placeholder="Masukkan password baru"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword((prev) => !prev)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
-                >
-                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Konfirmasi Password Baru
-              </label>
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Ulangi password baru"
-                  className="w-full rounded-xl border border-[var(--color-admin4)] bg-white py-3 pl-12 pr-12 text-gray-800 placeholder:text-gray-400 transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 transition hover:text-gray-700"
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="inline-flex flex-1 items-center justify-center rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white shadow-sm transition hover:bg-[var(--color-admin2)] hover:text-[#222222] disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isLoading ? "Memproses..." : "Simpan Password Baru"}
-              </button>
-            </div>
+            <Button type="submit" variant="admin" size="lg" className="mt-2 w-full" disabled={loading}>
+              {loading ? "Memproses..." : "Simpan Password Baru"}
+            </Button>
           </form>
-        </div>
+        </Card>
 
-        <div className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-          <h3 className="mb-4 text-xl font-bold text-gray-800">
-            Tips Keamanan
-          </h3>
-
-          <div className="space-y-4">
-            <div className="rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-4">
-              <p className="font-medium text-gray-800">
-                Gunakan kombinasi yang kuat
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol agar password lebih aman.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-4">
-              <p className="font-medium text-gray-800">
-                Hindari password lama
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Jangan gunakan ulang password yang pernah dipakai sebelumnya untuk meminimalkan risiko kebocoran akun.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-[var(--color-admin4)] bg-[var(--color-admin3)] p-4">
-              <p className="font-medium text-gray-800">
-                Login ulang setelah perubahan
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-gray-600">
-                Setelah password berhasil diubah, sistem akan meminta login ulang menggunakan password baru.
-              </p>
-            </div>
+        {/* tips keamanan */}
+        <Card className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-admin" />
+            <h3 className="text-base font-semibold">Tips Keamanan</h3>
           </div>
-        </div>
-      </section>
+          <div className="space-y-3 text-sm">
+            {[
+              ["Kombinasi kuat", "Pakai huruf besar, kecil, angka, dan simbol."],
+              ["Hindari password lama", "Jangan pakai ulang password yg pernah dipake."],
+              ["Minimal 8 karakter", "Lebih panjang = lebih susah di-brute force."],
+            ].map(([t, d]) => (
+              <div key={t} className="rounded-xl border border-border bg-muted/40 p-3">
+                <p className="font-medium">{t}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{d}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

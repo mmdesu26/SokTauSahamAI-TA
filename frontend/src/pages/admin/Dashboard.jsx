@@ -1,293 +1,171 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  Database,
-  XCircle,
-} from "lucide-react";
+// ADMIN DASHBOARD — re-skin UI, logic monitoring log sama persis
+import { useEffect, useMemo, useState } from "react";
+import { Activity, AlertTriangle, CheckCircle2, Database, XCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api";
-import { useAppAlert } from "@/components/AppAlertContext";
+import { useAppAlert } from "@/components/AppAlert";
+import { Card } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import Spinner from "@/components/ui/Spinner";
+import { cn } from "@/lib/utils";
 
-function formatRelativeTime(timestamp) {
-  if (!timestamp) return "-";
+// helper format waktu relatif — sama persis dr versi lama
+function fmtRelative(ts) {
+  if (!ts) return "-";
+  const raw = String(ts).trim();
+  const norm = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const utc = norm.endsWith("Z") ? norm : `${norm}Z`;
+  const d = new Date(utc);
+  if (Number.isNaN(d.getTime())) return String(ts);
 
-  const raw = String(timestamp).trim();
-
-  // paksa jadi UTC
-  const normalized = raw.includes("T")
-    ? raw
-    : raw.replace(" ", "T");
-
-  const utcValue = normalized.endsWith("Z") ? normalized : `${normalized}Z`;
-
-  const date = new Date(utcValue);
-  if (Number.isNaN(date.getTime())) return String(timestamp);
-
-  const diffMs = Date.now() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
   if (diffMin < 1) return "Baru saja";
   if (diffMin < 60) return `${diffMin} menit lalu`;
-
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} jam lalu`;
-
-  const diffDay = Math.floor(diffHour / 24);
-  return `${diffDay} hari lalu`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH} jam lalu`;
+  return `${Math.floor(diffH / 24)} hari lalu`;
 }
 
-function getStatusTone(level) {
-  switch (String(level || "").toLowerCase()) {
-    case "error":
-      return "error";
-    case "warning":
-      return "warning";
-    case "success":
-      return "success";
-    default:
-      return "info";
+const toneByLevel = (lv) => {
+  switch (String(lv || "").toLowerCase()) {
+    case "error": return "danger";
+    case "warning": return "warning";
+    case "success": return "success";
+    default: return "info";
   }
-}
-
-function buildServiceStatus(logs) {
-  const findLatestBySource = (keyword) => {
-    return logs.find((log) =>
-      String(log?.source || "")
-        .toLowerCase()
-        .includes(keyword.toLowerCase())
-    );
-  };
-
-  const yfinanceLog = findLatestBySource("yfinance");
-  const predictionLog = logs.find((log) => {
-    const source = String(log?.source || "").toLowerCase();
-    const message = String(log?.message || "").toLowerCase();
-    return source.includes("prediction") || message.includes("prediksi");
-  });
-  const databaseLog = findLatestBySource("database");
-
-  const buildItem = (name, log, fallbackStatus = "Unknown") => {
-    const level = String(log?.level || "").toLowerCase();
-    let status = fallbackStatus;
-
-    if (level === "error") status = "Bermasalah";
-    else if (level === "warning") status = "Warning";
-    else if (level === "success" || level === "info") status = "Normal";
-
-    return {
-      name,
-      status,
-      level: level || "info",
-      uptime: log?.timestamp ? formatRelativeTime(log.timestamp) : "-",
-      detail: log?.message || "Belum ada data log.",
-    };
-  };
-
-  return [
-    buildItem("API yFinance", yfinanceLog),
-    buildItem("Prediksi / ML", predictionLog),
-    buildItem("Database", databaseLog),
-  ];
-}
+};
 
 export default function AdminDashboard() {
   const { showError } = useAppAlert();
-
   const [logs, setLogs] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const fetchDashboardLogs = async () => {
-    setIsLoading(true);
+  // narik log dr backend
+  const fetchLogs = async () => {
+    setLoading(true);
     try {
-      const params = new URLSearchParams({
-        limit: 100,
-        offset: 0,
-      });
-
+      const params = new URLSearchParams({ limit: 100, offset: 0 });
       const { ok, data } = await apiFetch(`/admin/logs?${params}`);
-
-      if (ok && data?.success) {
-        setLogs(data.data || []);
-      } else {
-        showError(data?.message || "Gagal mengambil dashboard admin.", "Gagal");
-      }
-    } catch (error) {
-      console.error(error);
-      showError("Terjadi kesalahan saat mengambil dashboard admin.", "Gagal");
-    } finally {
-      setIsLoading(false);
-    }
+      if (ok && data?.success) setLogs(data.data || []);
+      else showError(data?.message || "Gagal mengambil log.", "Gagal");
+    } catch (e) {
+      console.error(e);
+      showError("Terjadi kesalahan.", "Gagal");
+    } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchDashboardLogs();
-  }, []);
+  useEffect(() => { fetchLogs(); }, []);
 
-  const summary = useMemo(() => {
-    const total = logs.length;
-    const success = logs.filter((l) => l.level === "success").length;
-    const warning = logs.filter((l) => l.level === "warning").length;
-    const error = logs.filter((l) => l.level === "error").length;
+  // hitung summary 4 angka — total/success/warning/error
+  const summary = useMemo(() => ({
+    total:   logs.length,
+    success: logs.filter((l) => l.level === "success").length,
+    warning: logs.filter((l) => l.level === "warning").length,
+    error:   logs.filter((l) => l.level === "error").length,
+  }), [logs]);
 
-    return { total, success, warning, error };
-  }, [logs]);
+  // ambil 5 aktivitas terbaru
+  const recent = useMemo(() => logs.slice(0, 5).map((l) => ({
+    id: l.id, message: l.message, source: l.source,
+    username: l.username || "system", level: l.level,
+    time: fmtRelative(l.timestamp), details: l.details,
+  })), [logs]);
 
-  const systemStatus = useMemo(() => buildServiceStatus(logs), [logs]);
+  const cards = [
+  {
+    label: "Total Aktivitas",
+    value: summary.total,
+    icon: Database,
+    tone: "info",
+    desc: "Jumlah seluruh log aktivitas sistem",
+  },
+  {
+    label: "Berhasil",
+    value: summary.success,
+    icon: CheckCircle2,
+    tone: "success",
+    desc: "Operasi yang berjalan dengan sukses",
+  },
+  {
+    label: "Perlu Perhatian",
+    value: summary.warning,
+    icon: AlertTriangle,
+    tone: "warning",
+    desc: "Ada kondisi tidak normal (warning)",
+  },
+  {
+    label: "Error",
+    value: summary.error,
+    icon: XCircle,
+    tone: "danger",
+    desc: "Operasi gagal atau terjadi kesalahan",
+  },
+];
 
-  const recentActivities = useMemo(() => {
-    return logs.slice(0, 3).map((log) => ({
-      id: log.id,
-      message: log.message,
-      source: log.source,
-      username: log.username || "system",
-      level: log.level,
-      time: formatRelativeTime(log.timestamp),
-      details: log.details,
-    }));
-  }, [logs]);
-
-  const summaryCards = [
-    {
-      label: "Total Log Terbaca",
-      value: summary.total,
-      icon: Database,
-      tone: "info",
-    },
-    {
-      label: "Success",
-      value: summary.success,
-      icon: CheckCircle2,
-      tone: "success",
-    },
-    {
-      label: "Warning",
-      value: summary.warning,
-      icon: AlertTriangle,
-      tone: "warning",
-    },
-    {
-      label: "Error",
-      value: summary.error,
-      icon: XCircle,
-      tone: "error",
-    },
-  ];
-
-  const getToneClasses = (tone) => {
-    switch (tone) {
-      case "success":
-        return {
-          icon: "text-emerald-600",
-          badge: "bg-emerald-100 text-emerald-700",
-          border: "border-emerald-200",
-        };
-      case "warning":
-        return {
-          icon: "text-amber-600",
-          badge: "bg-amber-100 text-amber-700",
-          border: "border-amber-200",
-        };
-      case "error":
-        return {
-          icon: "text-red-600",
-          badge: "bg-red-100 text-red-700",
-          border: "border-red-200",
-        };
-      default:
-        return {
-          icon: "text-[var(--color-admin)]",
-          badge: "bg-[var(--color-admin3)] text-[var(--color-admin)]",
-          border: "border-[var(--color-admin4)]",
-        };
-    }
-  };
+  const toneClass = (t) => ({
+    success: "bg-success/10 text-success",
+    warning: "bg-warning/10 text-warning",
+    danger:  "bg-danger/10 text-danger",
+    info:    "bg-admin-soft text-admin",
+  }[t]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-12 pb-16">
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-8 shadow-sm md:p-12">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-[#222222] md:text-5xl">
-          Admin Dashboard
-        </h1>
-        <p className="max-w-3xl text-lg text-[#666666] md:text-xl">
-         Monitor aktivitas sistem berdasarkan log asli.
-        </p>
-      </section>
+    <div className="space-y-8">
+      {/* header pake admin accent */}
+      <header>
+        <Badge variant="admin" className="mb-2"><Activity className="h-3 w-3" /> Monitoring</Badge>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Admin Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Monitor aktivitas sistem berdasarkan log asli.</p>
+      </header>
 
-      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((item) => {
-          const Icon = item.icon;
-          const tone = getToneClasses(item.tone);
-
+      {/* 4 stat cards */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((c) => {
+          const Icon = c.icon;
           return (
-            <div
-              key={item.label}
-              className={`rounded-3xl border bg-white p-6 shadow-sm ${tone.border}`}
-            >
-              <div className="mb-4 flex items-center justify-between">
-                <Icon className={`h-7 w-7 ${tone.icon}`} />
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone.badge}`}>
-                  {item.label}
-                </span>
+            <Card key={c.label} className="p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", toneClass(c.tone))}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <Badge variant={c.tone === "info" ? "admin" : c.tone}>{c.label}</Badge>
               </div>
-
-              <p className="text-3xl font-bold text-gray-800">{item.value}</p>
-            </div>
+              <p className="text-3xl font-bold">{c.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{c.desc}</p>
+            </Card>
           );
         })}
       </section>
 
-      <section className="rounded-3xl border border-[var(--color-admin4)] bg-white p-7 shadow-sm">
-        <h2 className="mb-6 text-2xl font-bold text-gray-800">
-          Aktivitas Terbaru
-        </h2>
+      {/* aktivitas terbaru */}
+      <Card className="p-6">
+        <h2 className="mb-5 text-lg font-semibold">Aktivitas Terbaru</h2>
 
-        {isLoading ? (
-          <p className="text-gray-500">Memuat aktivitas...</p>
-        ) : recentActivities.length > 0 ? (
-          <div className="space-y-4">
-            {recentActivities.map((activity) => {
-              const tone = getToneClasses(getStatusTone(activity.level));
-
+        {loading ? <Spinner label="Memuat aktivitas..." />
+          : recent.length ? (
+          <div className="space-y-3">
+            {recent.map((a) => {
+              const tone = toneByLevel(a.level);
               return (
-                <div
-                  key={activity.id}
-                  className={`rounded-xl border bg-[var(--color-admin3)] p-5 ${tone.border}`}
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone.badge}`}>
-                          {String(activity.level || "info").toUpperCase()}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {activity.source} • {activity.username}
-                        </span>
+                <div key={a.id} className={cn("rounded-xl border border-border p-4", "bg-muted/30")}>
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                        <Badge variant={tone}>{String(a.level || "info").toUpperCase()}</Badge>
+                        <span className="text-xs text-muted-foreground">{a.source} • {a.username}</span>
                       </div>
-
-                      <p className="font-medium text-gray-800">
-                        {activity.message}
-                      </p>
-
-                      {activity.details ? (
-                        <p className="mt-2 text-sm text-gray-600">
-                          {activity.details}
-                        </p>
-                      ) : null}
+                      <p className="text-sm font-medium">{a.message}</p>
+                      {a.details && <p className="mt-1 text-xs text-muted-foreground">{a.details}</p>}
                     </div>
-
-                    <span className="shrink-0 text-xs text-gray-500">
-                      {activity.time}
-                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{a.time}</span>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="text-gray-500">Belum ada aktivitas log.</p>
+          <p className="text-center text-sm text-muted-foreground">Belum ada aktivitas log.</p>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

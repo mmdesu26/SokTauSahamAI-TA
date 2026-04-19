@@ -1,206 +1,205 @@
+// GLOSARIUM — halaman dedicated buat daftar istilah saham
 import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   BadgeCheck,
   Library,
-  ExternalLink,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import Badge from "@/components/ui/Badge";
+import Spinner from "@/components/ui/Spinner";
 
-export default function InvestorGlossary() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [glossaryItems, setGlossaryItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState(null);
+// helper sederhana buat nentuin definisi termasuk panjang atau tidak
+function isLongText(text = "", limit = 160) {
+  return String(text).trim().length > limit;
+}
 
-  const fetchGlossary = async () => {
-    setIsLoading(true);
-
-    try {
-      const { ok, data } = await apiFetch("/glossary");
-
-      if (ok && data.success) {
-        setGlossaryItems(data.data || []);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+export default function Glossary() {
+  const [q, setQ] = useState("");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(null); // id card yg lagi kebuka
 
   useEffect(() => {
-    fetchGlossary();
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await apiFetch("/glossary");
+        if (r.ok && r.data?.success) setItems(r.data.data || []);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
+  // filter client-side
   const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-
-    return glossaryItems.filter((item) => {
-      if (!q) return true;
-
-      return (
-        item.term?.toLowerCase().includes(q) ||
-        item.definition?.toLowerCase().includes(q) ||
-        item.verifiedBy?.toLowerCase().includes(q)
-      );
-    });
-  }, [glossaryItems, searchQuery]);
-
-  const getStatusBadge = (status) => {
-    if (status === "verified") {
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300">
-          <BadgeCheck className="h-3.5 w-3.5" />
-          Terverifikasi
-        </span>
-      );
-    }
-
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/15 px-3 py-1 text-xs font-semibold text-cyan-300">
-        <Library className="h-3.5 w-3.5" />
-        Berbasis Literatur Resmi
-      </span>
+    const s = q.toLowerCase().trim();
+    if (!s) return items;
+    return items.filter((x) =>
+      x.term?.toLowerCase().includes(s) ||
+      x.definition?.toLowerCase().includes(s) ||
+      x.verifiedBy?.toLowerCase().includes(s)
     );
-  };
+  }, [items, q]);
 
-  const toggleExpand = (id) => {
-    setExpandedId((prev) => (prev === id ? null : id));
-  };
+  // helper buat tampilin badge status
+  const StatusBadge = ({ status }) =>
+    status === "verified" ? (
+      <Badge variant="success">
+        <BadgeCheck className="h-3 w-3" /> Terverifikasi
+      </Badge>
+    ) : (
+      <Badge variant="info">
+        <Library className="h-3 w-3" /> Berbasis Literatur
+      </Badge>
+    );
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-10 pb-16">
-      {/* Header */}
-      <div className="rounded-3xl border border-cyan-500/20 bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-indigo-950/30 p-8 backdrop-blur-md md:p-12">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight text-white md:text-5xl">
+    <div className="mx-auto w-full max-w-6xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
+      <header className="text-center">
+        <Badge variant="primary" className="mb-3">
+          Knowledge Base
+        </Badge>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Glosarium Saham
         </h1>
-        <p className="max-w-3xl text-lg text-slate-300 md:text-xl">
-          Pahami istilah-istilah penting dalam dunia investasi saham dan
-          analisis pasar Indonesia.
+        <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+          Pahami istilah penting dunia investasi & analisis pasar Indonesia.
         </p>
+      </header>
+
+      {/* search bar — sama style kayak halaman stocks biar konsisten */}
+      <div className="mx-auto max-w-2xl">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Cari istilah atau definisi..."
+            className="h-12 pl-11 text-base"
+          />
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="relative mx-auto max-w-2xl">
-        <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari istilah atau definisi..."
-          className="w-full rounded-xl border border-slate-800 bg-slate-900/50 py-3 pl-14 pr-4 text-white placeholder-slate-500 transition focus:border-[#4988C4]/60 focus:outline-none"
-        />
-      </div>
-
-      {/* Jumlah hasil */}
-      {!isLoading && (
-        <p className="text-sm text-slate-500">
+      {!loading && (
+        <p className="text-center text-sm text-muted-foreground">
           Menampilkan{" "}
-          <span className="font-semibold text-slate-300">{filtered.length}</span>{" "}
+          <span className="font-semibold text-foreground">
+            {filtered.length}
+          </span>{" "}
           istilah
-          {searchQuery && (
+          {q && (
             <>
               {" "}
-              untuk kata kunci{" "}
-              <span className="font-semibold text-cyan-400">
-                &quot;{searchQuery}&quot;
-              </span>
+              untuk{" "}
+              <span className="font-semibold text-primary">"{q}"</span>
             </>
           )}
         </p>
       )}
 
-      {/* Konten */}
-      {isLoading ? (
-        <div className="py-20 text-center">
-          <p className="text-xl text-slate-400">Memuat glosarium...</p>
-        </div>
-      ) : filtered.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item) => {
-            const isExpanded = expandedId === item.id;
+      {loading ? (
+        <Card className="p-12">
+          <Spinner label="Memuat glosarium..." />
+        </Card>
+      ) : filtered.length ? (
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((it) => {
+            const open = expanded === it.id;
+
+            const definitionIsLong = isLongText(it.definition);
+            const hasSourceLink = Boolean(it.sourceUrl);
+            const isVerified = it.status === "verified";
+            const hasVerifiedBy = Boolean(it.verifiedBy);
+
+            // tombol "Selengkapnya" cuma muncul kalau memang ada info lanjutan
+            const shouldShowExpandButton =
+              definitionIsLong || hasSourceLink || isVerified || hasVerifiedBy;
 
             return (
-              <div
-                key={item.id}
-                className="group flex flex-col rounded-3xl border border-slate-800 bg-slate-900/65 backdrop-blur-md transition-all duration-300 hover:border-cyan-500/40 hover:shadow-lg hover:shadow-cyan-900/20"
+              <Card
+                key={it.id}
+                className="flex h-full flex-col p-5 transition-all hover:border-primary/40 hover:shadow-soft"
               >
-                {/* Card body - fixed area */}
-                <div className="flex flex-1 flex-col p-6">
-                  {/* Term + Badge */}
-                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="text-lg font-semibold text-cyan-400 transition-colors group-hover:text-cyan-300">
-                      {item.term}
-                    </h3>
-                    {getStatusBadge(item.verificationStatus)}
-                  </div>
-
-                  {/* Definisi: clamp default, expand kalau diklik */}
-                  <p
-                    className={`text-sm leading-relaxed text-slate-300 transition-all duration-300 ${
-                      isExpanded ? "" : "line-clamp-4"
-                    }`}
-                  >
-                    {item.definition}
-                  </p>
-
-                  {/* Tombol baca selengkapnya */}
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(item.id)}
-                    className="mt-3 inline-flex items-center gap-1 self-start text-xs font-medium text-cyan-400 transition hover:text-cyan-300"
-                  >
-                    {isExpanded ? (
-                      <>
-                        Sembunyikan <ChevronUp className="h-3.5 w-3.5" />
-                      </>
-                    ) : (
-                      <>
-                        Baca selengkapnya <ChevronDown className="h-3.5 w-3.5" />
-                      </>
-                    )}
-                  </button>
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <h3 className="text-base font-semibold leading-tight">
+                    {it.term}
+                  </h3>
+                  <StatusBadge status={it.status} />
                 </div>
 
-                {/* Footer info */}
-                <div className="space-y-2 rounded-b-3xl border-t border-slate-800 bg-slate-950/50 px-6 py-4 text-xs text-slate-400">
-                  {item.verifiedBy && (
-                    <p>
-                      <span className="font-semibold text-slate-300">
-                        Terverifikasi oleh:
-                      </span>{" "}
-                      {item.verifiedBy}
-                    </p>
-                  )}
+                {/* definisi — dipotong kalau belum di-expand */}
+                <p
+                  className={`text-sm leading-relaxed text-muted-foreground ${
+                    open ? "" : "line-clamp-3"
+                  }`}
+                >
+                  {it.definition}
+                </p>
 
-                  {item.sourceUrl ? (
-                    <a
-                      href={item.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-cyan-400 underline underline-offset-4 transition hover:text-cyan-300"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                      Lihat sumber
-                    </a>
+                {/* footer card */}
+                <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+                  {it.verifiedBy ? (
+                    <span className="truncate text-xs text-muted-foreground">
+                      Sumber:{" "}
+                      <span className="text-foreground">{it.verifiedBy}</span>
+                    </span>
                   ) : (
-                    <p className="text-slate-600">Tidak ada sumber</p>
+                    <span />
+                  )}
+
+                  {shouldShowExpandButton && (
+                    <button
+                      onClick={() => setExpanded(open ? null : it.id)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:opacity-80"
+                    >
+                      {open ? "Tutup" : "Selengkapnya"}
+                      {open ? (
+                        <ChevronUp className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                    </button>
                   )}
                 </div>
-              </div>
+
+                {open && (
+                  <div className="mt-3 space-y-2">
+                    {it.verifiedBy && (
+                      <p className="text-xs text-muted-foreground">
+                        Diverifikasi / sumber oleh:{" "}
+                        <span className="font-medium text-foreground">
+                          {it.verifiedBy}
+                        </span>
+                      </p>
+                    )}
+
+                    {it.sourceUrl && (
+                      <a
+                        href={it.sourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Buka sumber
+                      </a>
+                    )}
+                  </div>
+                )}
+              </Card>
             );
           })}
         </div>
       ) : (
-        <div className="py-20 text-center">
-          <p className="text-xl text-slate-400">
-            Tidak menemukan istilah yang sesuai dengan pencarian &quot;
-            {searchQuery}&quot;
-          </p>
-          <p className="mt-2 text-slate-500">Coba gunakan kata kunci lain.</p>
-        </div>
+        <Card className="p-12 text-center text-muted-foreground">
+          Tidak ada istilah yang cocok dengan "{q}".
+        </Card>
       )}
     </div>
   );

@@ -1,27 +1,72 @@
-from flask import Blueprint, jsonify, g, request
-from app.utils.auth_decorators import token_required, role_required
-from app import db
-from app.models import Stock, StockProfile, StockFundamental, StockPriceHistory, SystemLog
-from app.utils.yfinance_helper import YFinanceHelper
-from app.utils.logger import log_stock_crud, log_external_service, SystemLogger
+from flask import Blueprint, jsonify, g, request  # Flask core: routing, response, context user
+from app.utils.auth_decorators import token_required, role_required  # Decorator untuk autentikasi & role
+from app import db  # Instance database (SQLAlchemy)
+from app.models import Stock, StockProfile, StockFundamental, StockPriceHistory, SystemLog  # Model DB
+from app.utils.yfinance_helper import YFinanceHelper  # Helper untuk ambil data dari Yahoo Finance
+from app.utils.logger import log_stock_crud, log_external_service, SystemLogger  # Logging custom
 import logging
 
+# Logger untuk file ini
 logger = logging.getLogger(__name__)
+
+# Blueprint admin (prefix endpoint biasanya /admin)
 admin_bp = Blueprint("admin_bp", __name__)
 
 
+# =========================
+# Helper Functions
+# =========================
+
 def _user_id():
+    """
+    Ambil user id dari context Flask (g.current_user)
+    Digunakan untuk logging audit trail
+    """
     return getattr(g, "current_user", {}).get("id")
 
 
 def _ip_address():
+    """
+    Ambil IP address user
+    Mendukung proxy (X-Forwarded-For)
+    """
     return request.headers.get("X-Forwarded-For", request.remote_addr)
 
 
 def _save_daily_ohlc(stock_id, ticker_yf):
-    ohlc_data = YFinanceHelper.get_ohlc_data(ticker_yf, days=252, exclude_today=True)
+    """
+    Ambil data OHLC (Open High Low Close) dari Yahoo Finance
+    dan simpan ke tabel StockPriceHistory
+    """
+
+    # Ambil 1 tahun data (252 hari trading)
+    hist = YFinanceHelper.get_historical_prices(
+        ticker_yf,
+        days=252,
+        exclude_today=True
+    )
+
+    # Hapus data lama agar selalu fresh
     StockPriceHistory.query.filter_by(stock_id=stock_id).delete()
-    for i, candle in enumerate(ohlc_data):
+
+    # Jika data kosong → return kosong
+    if hist is None or hist.empty:
+        return []
+
+    ohlc_data = []
+
+    # Loop setiap baris data historis
+    for i, (idx, row) in enumerate(hist.iterrows()):
+        candle = {
+            "date": idx.strftime("%Y-%m-%d"),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": float(row["Close"]),
+        }
+        ohlc_data.append(candle)
+
+        # Simpan ke database
         db.session.add(StockPriceHistory(
             stock_id=stock_id,
             timeframe="1D",
@@ -32,26 +77,54 @@ def _save_daily_ohlc(stock_id, ticker_yf):
             close_price=candle["close"],
             sort_order=i,
         ))
+
     return ohlc_data
 
+
+# =========================
+# Routes
+# =========================
 
 @admin_bp.route("/dashboard", methods=["GET"])
 @token_required
 @role_required("admin")
 def admin_dashboard():
-    return jsonify({"success": True, "message": "Selamat datang di dashboard admin.", "user": g.current_user}), 200
+    """
+    Endpoint sederhana untuk cek akses admin
+    """
+    return jsonify({
+        "success": True,
+        "message": "Selamat datang di dashboard admin.",
+        "user": g.current_user
+    }), 200
 
 
 @admin_bp.route("/stocks", methods=["GET"])
 @token_required
 @role_required("admin")
 def get_all_stocks():
+    """
+    Ambil semua saham dari database
+    """
     try:
         stocks = Stock.query.all()
-        return jsonify({"success": True, "data": [stock.to_dict() for stock in stocks]}), 200
+
+        return jsonify({
+            "success": True,
+            "data": [stock.to_dict() for stock in stocks]
+        }), 200
+
     except Exception as e:
         logger.error(f"Error fetching stocks: {str(e)}")
-        SystemLogger.error("Stock Management", "Gagal mengambil daftar saham", details=str(e), user_id=_user_id(), ip_address=_ip_address())
+
+        SystemLogger.error(
+            "Stock Management",
+            "Gagal mengambil daftar saham",
+            details=str(e),
+            user_id=_user_id(),
+            ip_address=_ip_address()
+        )
+
         return jsonify({"success": False, "message": str(e)}), 500
 
 
@@ -59,26 +132,43 @@ def get_all_stocks():
 @token_required
 @role_required("admin")
 def create_stock():
+    """
+    Tambah saham baru ke database
+    Flow:
+    1. Validasi input
+    2. Ambil data dari Yahoo Finance
+    3. Simpan ke DB (Stock, Profile, Fundamental, PriceHistory)
+    """
     try:
         data = request.get_json() or {}
+
+        # Ambil ticker dan status
         ticker_input = (data.get("ticker") or "").strip().upper()
         status = (data.get("status") or "Active").strip()
 
+        # Validasi ticker
         if not ticker_input:
             return jsonify({"success": False, "message": "Ticker wajib diisi"}), 400
 
+        # Format ticker untuk Yahoo Finance
         ticker_yf = ticker_input if ticker_input.endswith(".JK") else f"{ticker_input}.JK"
         ticker_code = ticker_input.replace(".JK", "")
 
+        # Cek duplikasi
         if Stock.query.filter_by(ticker=ticker_code).first():
             return jsonify({"success": False, "message": f"Saham {ticker_code} sudah ada"}), 409
 
+        # Ambil data eksternal
         info = YFinanceHelper.get_stock_info(ticker_yf, translate_summary=True)
         fundamentals = YFinanceHelper.get_fundamentals(ticker_yf)
-        if not info or not info.get("longName"):
-            log_external_service("yfinance", f"Ticker {ticker_code} tidak ditemukan di yfinance", success=False, user_id=_user_id(), ip_address=_ip_address())
-            return jsonify({"success": False, "message": f"Ticker {ticker_code} tidak ditemukan di yfinance"}), 404
 
+        # Validasi hasil API
+        if not info or not info.get("longName"):
+            log_external_service("yfinance", f"Ticker {ticker_code} tidak ditemukan", success=False,
+                                 user_id=_user_id(), ip_address=_ip_address())
+            return jsonify({"success": False, "message": f"Ticker {ticker_code} tidak ditemukan"}), 404
+
+        # Simpan Stock utama
         stock = Stock(
             ticker=ticker_code,
             name=info.get("longName", ticker_code),
@@ -87,8 +177,9 @@ def create_stock():
             status=status,
         )
         db.session.add(stock)
-        db.session.flush()
+        db.session.flush()  # supaya dapat stock.id
 
+        # Simpan profile perusahaan
         profile = StockProfile(
             stock_id=stock.id,
             long_name=info.get("longName", ""),
@@ -102,32 +193,56 @@ def create_stock():
         )
         db.session.add(profile)
 
+        # Simpan data fundamental
         fundamental = StockFundamental(stock_id=stock.id)
         fundamental.eps_ttm = fundamentals.get("eps")
         fundamental.pbv = fundamentals.get("pbv")
         fundamental.roe = fundamentals.get("roe")
         fundamental.per_ttm = fundamentals.get("pe")
+
         raw = fundamentals.get("rawData", {})
         fundamental.revenue = raw.get("revenue")
         fundamental.net_income = raw.get("netIncome")
         fundamental.total_assets = raw.get("totalAssets")
         fundamental.total_equity = raw.get("totalEquity")
+
         db.session.add(fundamental)
 
+        # Simpan data harga historis
         ohlc_data = _save_daily_ohlc(stock.id, ticker_yf)
         if ohlc_data:
-            stock.price = ohlc_data[-1]["close"]
+            stock.price = ohlc_data[-1]["close"]  # update harga terbaru
 
         db.session.commit()
+
+        # Logging aktivitas
         log_stock_crud("CREATE", stock.id, ticker_code, user_id=_user_id(), ip_address=_ip_address())
 
-        return jsonify({"success": True, "message": f"Saham {ticker_code} berhasil ditambahkan", "data": stock.to_dict()}), 201
+        return jsonify({
+            "success": True,
+            "message": f"Saham {ticker_code} berhasil ditambahkan",
+            "data": stock.to_dict()
+        }), 201
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error creating stock: {str(e)}")
-        log_stock_crud("CREATE", None, (request.get_json() or {}).get("ticker", "UNKNOWN"), user_id=_user_id(), error=str(e), ip_address=_ip_address())
+
+        log_stock_crud("CREATE", None, ticker_input if 'ticker_input' in locals() else "UNKNOWN",
+                       user_id=_user_id(), error=str(e), ip_address=_ip_address())
+
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+# =========================
+# ROUTE LAIN (ringkas)
+# =========================
+
+# update_stock → update status saham
+# search_stocks → cari saham via Yahoo
+# get_logs → ambil system log
+# delete_stock → hapus semua data saham
+# sync_stocks_data → batch update saham populer
 
 @admin_bp.route("/stocks/<int:stock_id>", methods=["PUT"])
 @token_required

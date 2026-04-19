@@ -1,59 +1,55 @@
-import React, { useEffect, useState } from "react";
+// Layout investor — Navbar atas + main content + footer
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { AlertCircle } from "lucide-react";
-import ResizableNavbarWrapper from "@/components/ResizableNavbar";
-import BoxesWrapper from "@/components/BoxesBg";
+import Navbar from "@/components/Navbar";
+import ConfirmModal from "@/components/ConfirmModal";
 
 export default function InvestorLayout() {
   const navigate = useNavigate();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
 
   useEffect(() => {
-    document.title = "SokTauSaham";
+    document.title = "SokTauSaham — Investasi cerdas dengan AI";
   }, []);
 
-  const handleLogoutClick = () => setShowLogoutModal(true);
-
-  const handleConfirmLogout = () => {
-    setShowLogoutModal(false);
-    navigate("/");
-  };
-
-  const navItems = [
-    { name: "Dashboard", link: "/investor/dashboard" },
-    { name: "Cari Saham", link: "/investor/stocks" },
-    { name: "Glosarium", link: "/investor/glossary" },
+  // nav items investor — Home / Cari Saham / Glosarium
+  const items = [
+    { name: "Home", link: "/" },
+    { name: "Cari Saham", link: "/stocks" },
+    { name: "Glosarium", link: "/glossary" },
   ];
 
   return (
-    <BoxesWrapper className="min-h-screen w-full">
-      <div className="fixed top-0 left-0 z-50 w-full">
-        <ResizableNavbarWrapper brand="SokTauSaham" items={navItems} onLogout={handleLogoutClick} logoutText="Kembali ke Beranda" className="dark" />
-      </div>
+    <div className="min-h-screen bg-background text-foreground">
+      <Navbar items={items} />
 
-      {showLogoutModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-primary-dark/80 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-primary/25 bg-primary-dark/70 p-7 shadow-2xl backdrop-blur-sm">
-            <div className="mb-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/15">
-                <AlertCircle className="h-7 w-7 text-red-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-bg-light">Yakin ingin kembali?</h3>
-            </div>
-            <p className="mb-8 leading-relaxed text-bg-light/75">Anda akan keluar dari halaman ini.</p>
-            <div className="flex gap-4">
-              <button onClick={() => setShowLogoutModal(false)} className="flex-1 rounded-xl border border-primary/20 bg-primary/20 px-5 py-3 font-medium text-bg-light transition hover:bg-primary/30">Batal</button>
-              <button onClick={handleConfirmLogout} className="flex-1 rounded-xl bg-red-600 px-5 py-3 font-medium text-white transition hover:bg-red-700">Ya, Kembali</button>
-            </div>
+      <ConfirmModal
+        open={showLogout}
+        title="Yakin ingin kembali?"
+        description="Anda akan keluar dari halaman ini."
+        confirmText="Ya, kembali"
+        tone="destructive"
+        onCancel={() => setShowLogout(false)}
+        onConfirm={() => { setShowLogout(false); navigate("/"); }}
+      />
+
+      {/* main — kasih padding top biar gak ketiban navbar fixed */}
+      <main className="pt-16">
+        {/* hero glow halus di belakang konten utama */}
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[480px] bg-hero-glow" />
+          <div className="relative">
+            <Outlet />
           </div>
         </div>
-      )}
-
-      <main className="relative z-10 min-h-screen w-full pt-24">
-        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
-        </div>
       </main>
-    </BoxesWrapper>
+
+      {/* footer simpel */}
+      <footer className="mt-20 border-t border-border bg-muted/40">
+        <div className="mx-auto max-w-7xl px-4 py-8 text-center text-sm text-muted-foreground sm:px-6 lg:px-8">
+          © {new Date().getFullYear()} SokTauSaham — Platform analisis saham berbasis AI.
+        </div>
+      </footer>
+    </div>
   );
 }
