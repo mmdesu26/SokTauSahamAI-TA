@@ -1,6 +1,3 @@
-# ===================================================================
-# IMPORT STATEMENT / PERNYATAAN IMPOR
-# ===================================================================
 from app import db, bcrypt
 # ^ Mengimpor dua objek dari package 'app' (file __init__.py di folder app):
 #   - db     : objek SQLAlchemy (ORM / Object Relational Mapper) yang
