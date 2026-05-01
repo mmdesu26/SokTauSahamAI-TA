@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import Button from "./ui/Button";
+import ConfirmModal from "./ConfirmModal";
 import { cn } from "@/lib/utils";
 import { clearAdminSession } from "@/utils/authSession";
 import { apiFetch } from "@/lib/api";
@@ -22,13 +23,30 @@ const menu = [
 
 export default function AdminSidebar() {
   const [open, setOpen] = useState(false); // mobile drawer toggle
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false); // modal konfirmasi
+  const [loggingOut, setLoggingOut] = useState(false);
   const navigate = useNavigate();
 
-  // logout — hit api & clear session
-  const handleLogout = async () => {
-    try { await apiFetch("/auth/logout", { method: "POST" }); } catch {}
-    clearAdminSession();
-    navigate("/admin/login", { replace: true });
+  // Step 1: user klik tombol Logout → buka modal konfirmasi
+  const handleLogoutClick = () => {
+    setOpen(false);            // tutup drawer mobile kalau kebuka
+    setShowLogoutConfirm(true); // buka modal
+  };
+
+  // Step 2: user klik "Ya, Logout" di modal → benerannya logout
+  const doLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch (e) {
+      // ignore — kalau api error kita tetap logout di client
+    } finally {
+      clearAdminSession(); // 🔥 FIX: sebelumnya typo `clearAuthSession` → undefined ref
+      setShowLogoutConfirm(false);
+      setLoggingOut(false);
+      navigate("/admin/login", { replace: true });
+    }
   };
 
   // konten sidebar — dipake di dua tempat (desktop & mobile drawer)
@@ -81,7 +99,7 @@ export default function AdminSidebar() {
           variant="outline"
           size="sm"
           className="w-full justify-start text-danger hover:bg-danger/10 hover:border-danger/40 hover:text-danger"
-          onClick={handleLogout}
+          onClick={handleLogoutClick}
         >
           <LogOut className="h-4 w-4" />
           Logout
@@ -135,6 +153,18 @@ export default function AdminSidebar() {
           </aside>
         </div>
       )}
+
+      {/* Modal konfirmasi logout */}
+      <ConfirmModal
+        open={showLogoutConfirm}
+        title="Keluar dari Admin Panel?"
+        description="Kamu akan logout dari sesi ini dan diarahkan ke halaman login."
+        confirmText={loggingOut ? "Memproses..." : "Ya, Logout"}
+        cancelText="Batal"
+        tone="destructive"
+        onCancel={() => !loggingOut && setShowLogoutConfirm(false)}
+        onConfirm={doLogout}
+      />
     </>
   );
 }

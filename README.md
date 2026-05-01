@@ -126,7 +126,7 @@ GET /api/stocks/BBCA/prediction
 │                     → ensemble (weighted avg)            │
 │                                                         │
 │  4. FundamentalScorer → EPS/ROE/PBV/PER rule scoring     │
-│     → estimasi return 3 bulan + rekomendasi BUY/HOLD/SELL│
+│     → estimasi return + rekomendasi BUY/HOLD/SELL│
 │                                                         │
 └─────────────────────────────────────────────────────────┘
    │

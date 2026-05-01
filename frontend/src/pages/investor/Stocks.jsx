@@ -180,7 +180,7 @@ export default function Stocks() {
           {
             icon: ShieldCheck,
             title: "Diversifikasi",
-            desc: "Jangan taruh semua dana di 1 saham — sebar risikonya.",
+            desc: "Jangan taruh semua dana di 1 saham sebar risikonya.",
           },
           {
             icon: Lightbulb,

@@ -215,6 +215,7 @@ def create_stock():
 
         db.session.commit()
 
+        # Perbarui benchmark median sektor setelah saham baru masuk.
         # Logging aktivitas
         log_stock_crud("CREATE", stock.id, ticker_code, user_id=_user_id(), ip_address=_ip_address())
 
@@ -402,6 +403,7 @@ def sync_stocks_data():
                 continue
 
         db.session.commit()
+
         return jsonify({"success": True, "message": f"Sinkronisasi berhasil untuk {len(synced_stocks)} saham", "synced_stocks": synced_stocks}), 200
     except Exception as e:
         db.session.rollback()

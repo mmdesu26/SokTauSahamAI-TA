@@ -14,7 +14,7 @@ export default function InvestorLayout() {
 
   // nav items investor — Home / Cari Saham / Glosarium
   const items = [
-    { name: "Home", link: "/" },
+    { name: "Dashboard", link: "/" },
     { name: "Cari Saham", link: "/stocks" },
     { name: "Glosarium", link: "/glossary" },
   ];

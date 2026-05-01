@@ -64,7 +64,7 @@ export default function Glossary() {
     <div className="mx-auto w-full max-w-6xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
       <header className="text-center">
         <Badge variant="primary" className="mb-3">
-          Knowledge Base
+          Dasar Pengetahuan
         </Badge>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Glosarium Saham

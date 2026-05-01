@@ -1,5 +1,4 @@
-// ===== API CLIENT — gak diubah, cuma rapihin =====
-// buat narik data dari backend, auto inject token admin kalau ada
+// buat narik data dari backend
 import { clearAdminSession, getToken } from "@/utils/authSession";
 
 const isDev = import.meta.env.DEV;

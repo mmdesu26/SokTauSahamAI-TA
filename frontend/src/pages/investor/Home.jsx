@@ -65,8 +65,7 @@ export default function Home() {
           <div className="animate-fade-up">
             <Badge variant="primary" className="mb-6"><Sparkles className="h-3 w-3" /> Platform analisis saham dengan AI</Badge>
             <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">Investasi cerdas dengan <span className="text-gradient">pengalaman visual yang lebih hidup</span></h1>
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">Pantau pasar, pantau berita keuangan, analisis fundamental, dan dapatkan prediksi harga
-              dengan machine learning. Dirancang untuk para investor.
+            <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">Pantau pasar, analisis fundamental, dan dapatkan prediksi harga. Dirancang untuk para investor.
           </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link to="/stocks"><Button variant="gradient" size="lg">Mulai cari saham <ArrowRight className="h-4 w-4" /></Button></Link>
@@ -96,7 +95,7 @@ export default function Home() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary"><Layers3 className="h-6 w-6" /></div>
                     <div>
                       <p className="text-sm text-muted-foreground">Simulasi dashboard</p>
-                      <p className="text-xl font-bold">BBCA • TLKM • ASII</p>
+                      <p className="text-xl font-bold">BBCA • BRPT • HUMI</p>
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border/70 bg-background/70 p-4 backdrop-blur-sm">
@@ -135,8 +134,8 @@ export default function Home() {
                     <p className="text-sm text-muted-foreground">Benefit utama</p>
                     <ul className="mt-3 space-y-2 text-sm">
                       <li>• Visual lebih imersif dan berlapis</li>
-                      <li>• Konten investor lebih lengkap</li>
-                      <li>• Navigasi lebih cepat dipahami</li>
+                      <li>• Penjelasan fundamental lengkap</li>
+                      <li>• Navigasi mudah dipahami</li>
                     </ul>
                   </div>
                 </div>
@@ -270,7 +269,7 @@ export default function Home() {
             { icon: Brain, title: "Prediksi AI", desc: "Prediksi harga 1 hari ke depan dengan ML (Random Forest + Linear Regression)." },
             { icon: BookOpen, title: "Glosarium Lengkap", desc: "Pahami istilah saham yang sering bikin bingung pemula." },
             { icon: ShieldCheck, title: "Data Terpercaya", desc: "Bersumber dari yfinance & literatur resmi pasar modal." },
-            { icon: Zap, title: "Cepat & Ringan", desc: "Interface modern, smooth di laptop & HP." },
+            { icon: Zap, title: "Cepat & Ringan", desc: "UI modern, smooth di laptop & HP." },
           ].map((s) => {
             const Icon = s.icon;
             return (
@@ -291,18 +290,18 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <div>
-            <Badge variant="primary" className="mb-3">Why Choose Us</Badge>
+            <Badge variant="primary" className="mb-3">Kenapa Memilih Kami</Badge>
             <h2 className="text-2xl font-bold sm:text-3xl">
               Dibangun untuk investor yang serius soal data
             </h2>
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Kombinasi machine learning + analisis fundamental, dikemas dalam UI
-              minimal yang gak bikin overwhelmed.
+              Kombinasi machine learning dan analisis fundamental, dikemas dalam UI
+              minimal yang gak bikin kewalahan.
             </p>
 
             <div className="mt-8 space-y-4">
               {[
-                { icon: Brain, title: "AI yang transparan", desc: "Setiap prediksi disertai metrik akurasi (MAPE)." },
+                { icon: Brain, title: "AI yang transparan", desc: "Setiap prediksi disertai metrik akurasi." },
                 { icon: BookOpen, title: "Glosarium Lengkap", desc: "Pahami istilah saham yang sering bikin bingung pemula." },
                 { icon: ShieldCheck, title: "Tidak Ribet", desc: "Tidak perlu daftar akun atau login." },
                 { icon: Users, title: "Buat semua level", desc: "Dari pemula sampai analis, semua dapet tools yg pas." },
@@ -346,7 +345,7 @@ export default function Home() {
               </div>
               <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
                 <span>Rp 9.450</span>
-                <span>MAPE 2.34%</span>
+                <span>Akurasi 2.34%</span>
                 <span>Rp 9.900</span>
               </div>
             </Card>

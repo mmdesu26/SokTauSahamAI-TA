@@ -57,25 +57,42 @@ def _build_virtual_stock(ticker, stock=None):
 # ============================================================
 @stocks_bp.route("/stocks", methods=["GET"])
 def get_stocks():
-    search = request.args.get("search", "").strip()  # query cari
-    status = request.args.get("status", "").strip()  # filter status
-    query = Stock.query  # query builder
+    search = request.args.get("search", "").strip()
+    status = request.args.get("status", "").strip()
+    query = Stock.query
 
-    if search:  # kalau ada keyword cari
-        keyword = f"%{search}%"  # pattern LIKE
+    if search:
+        keyword = f"%{search}%"
         query = query.filter(
-            db.or_(  # cari di ticker ATAU nama ATAU sektor
+            db.or_(
                 Stock.ticker.ilike(keyword),
                 Stock.name.ilike(keyword),
                 Stock.sector.ilike(keyword)
             )
         )
 
-    if status:  # filter status (Active/Inactive)
+    if status:
         query = query.filter(Stock.status == status)
 
-    items = query.order_by(Stock.ticker.asc()).all()  # urutin A-Z, eksekusi query
-    return jsonify({"success": True, "data": [item.to_dict() for item in items]}), 200
+    items = query.order_by(Stock.ticker.asc()).all()
+
+    # ✅ Hitung change_percent real-time dari yfinance
+    result = []
+    for item in items:
+        stock_dict = item.to_dict()
+        try:
+            quote = YFinanceHelper.get_latest_quote(f"{item.ticker}.JK")
+            live_change = quote.get("changePercent")
+            if live_change is not None:
+                stock_dict["change"] = f"{live_change:+.2f}%"
+                # update harga terbaru juga sekalian
+                if quote.get("price"):
+                    stock_dict["price"] = str(quote.get("price"))
+        except Exception:
+            pass  # biarkan nilai default kalau yfinance error
+        result.append(stock_dict)
+
+    return jsonify({"success": True, "data": result}), 200
 
 
 # ============================================================
@@ -282,7 +299,7 @@ def get_candlestick_data(ticker):
 
 
 # ============================================================
-# ROUTE 6: prediksi AI (harga besok + fundamental 3 bulan)
+# ROUTE 6: prediksi AI (harga besok + fundamental)
 # ============================================================
 @stocks_bp.route("/stocks/<string:ticker>/prediction", methods=["GET"])
 def get_stock_prediction(ticker):
@@ -293,8 +310,9 @@ def get_stock_prediction(ticker):
         return jsonify({"success": False, "message": "Data saham tidak ditemukan."}), 404
 
     try:
-        # panggil ML predictor — pake suffix .JK buat Bursa Indonesia
-        result = predict_stock_price(f"{ticker.upper()}.JK")
+        # kirim sector dari DB langsung supaya scorer tidak perlu query yfinance lagi
+        sector_from_db = stock.sector if stock.sector and stock.sector != "-" else None
+        result = predict_stock_price(f"{ticker.upper()}.JK", sector=sector_from_db)
         if not result:  # model gagal
             log_prediction(ticker.upper(), False, "Model gagal menghasilkan prediksi.", ip_address=ip_address)
             return jsonify({"success": False, "message": "Prediksi gagal dijalankan."}), 500

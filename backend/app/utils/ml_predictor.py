@@ -111,15 +111,6 @@ class StockPricePredictor:
         return True
 
     def predict_next_period(self):
-        """
-        Melakukan prediksi harga periode berikutnya
-
-        Flow:
-        1. Jika belum training → lakukan training dulu
-        2. Set service dengan hasil training
-        3. Jalankan prediksi
-        """
-
         # Jika belum ada dataset (belum training)
         if self.dataset is None:
             trained = self.train_price_model()

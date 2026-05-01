@@ -131,36 +131,27 @@ def login():
 
 # Route untuk logout
 @auth_bp.route("/logout", methods=["POST"])
-# Harus punya token valid
 @token_required
-# Harus role admin
 @role_required("admin")
 def logout():
-    # Ambil username dari user yang tersimpan di global context Flask
-    username = g.current_user.get("username", "unknown")
+    """
+    Logout:
+    - Naikkan token_version
+    → semua token lama otomatis mati
+    """
 
-    # Ambil user id dari global context
     user_id = g.current_user.get("id")
 
-    # Ambil IP address user
-    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr)
+    user = User.query.get(user_id)
 
-    # Catat log logout berhasil
-    log_auth(
-        "LOGOUT",
-        username,
-        user_id=user_id,
-        success=True,
-        ip_address=ip_address
-    )
+    if user:
+        user.token_version += 1  # 🔥 invalidate semua token
+        db.session.commit()
 
-    # Return response sukses logout
-    # Catatan: logout di sini hanya logging, tidak menghapus token JWT di server
     return jsonify({
         "success": True,
         "message": "Logout berhasil."
     }), 200
-
 
 # Route untuk mengambil data user yang sedang login
 @auth_bp.route("/me", methods=["GET"])
@@ -289,6 +280,7 @@ def change_password():
         # Set password baru
         # Biasanya method ini akan hash password sebelum disimpan ke database
         user.set_password(new_password)
+        user.token_version += 1  # invalidate semua token lama setelah ganti password
 
         # Simpan perubahan ke database
         db.session.commit()

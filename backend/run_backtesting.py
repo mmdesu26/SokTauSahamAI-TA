@@ -9,9 +9,7 @@ import yfinance as yf
 from app.utils.ml_predictor import StockPricePredictor
 from app.utils.yfinance_helper import YFinanceHelper
 
-
 LOOKBACK_DAYS = 730
-
 
 def classify_error(error_pct: float) -> str:
     if error_pct <= 1:

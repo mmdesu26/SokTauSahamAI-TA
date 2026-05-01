@@ -1,97 +1,123 @@
 // ============================================================
 // StockDetail.jsx — halaman detail saham (profil + prediksi + fundamental)
-// FIX: duplikasi rasio, warna interpretasi light-mode, label raw data rapi
-// UX: tombol timeframe dibuat lebih jelas dan informatif
-// PERF: ganti timeframe hanya me-refresh card grafik, bukan seluruh halaman
+// UI POLISH: tab Prediksi & Fundamental dirapi — teks konsisten justify,
+//            spacing lebih breathable, hierarki visual lebih jelas
+// Bagian penjelasan panjang dibungkus Accordion toggle
 // ============================================================
 
-import { useEffect, useMemo, useState } from "react"; // ambil hook React buat state + efek + memo
-import { useParams, Link } from "react-router-dom"; // ambil param URL + komponen link
+import { useEffect, useMemo, useState } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
-  AlertTriangle, // ikon peringatan
-  ArrowLeft, // ikon panah balik
-  Building2, // ikon gedung buat tab profil
-  ExternalLink, // ikon link luar
-  TrendingUp, // panah naik
-  TrendingDown, // panah turun
-  Brain, // ikon AI
-  Sparkles, // ikon "keren" buat tab fundamental
-  CalendarRange, // ikon timeframe
-} from "lucide-react"; // icon pack
-import { apiFetch } from "@/lib/api"; // wrapper fetch ke backend
-import { Card } from "@/components/ui/Card"; // komponen kartu
-import Button from "@/components/ui/Button"; // tombol custom
-import Badge from "@/components/ui/Badge"; // badge label
-import Spinner from "@/components/ui/Spinner"; // loader muter
-import StockLogo from "@/components/ui/StockLogo"; // logo saham otomatis
-import StockCandleChart from "@/components/StockCandleChart"; // grafik candle
-import { cn } from "@/lib/utils"; // helper gabung className
+  AlertTriangle,
+  ArrowLeft,
+  Building2,
+  ExternalLink,
+  TrendingUp,
+  TrendingDown,
+  Brain,
+  Sparkles,
+  CalendarRange,
+  ChevronDown,
+} from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { Card } from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+import Spinner from "@/components/ui/Spinner";
+import StockLogo from "@/components/ui/StockLogo";
+import StockCandleChart from "@/components/StockCandleChart";
+import { cn } from "@/lib/utils";
 
 // ============================================================
-// BAGIAN 1: KAMUS LABEL — biar key mentah dari API jadi nama manusiawi
+// BAGIAN 0: KOMPONEN ACCORDION
 // ============================================================
 
-// dict rasio — key dari backend -> label yang enak dibaca
+function Accordion({ title, icon, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/10 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left",
+          "hover:bg-muted/20 transition-colors duration-150",
+          open && "border-b border-border/60"
+        )}
+        aria-expanded={open}
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          {icon && <span className="text-base">{icon}</span>}
+          {title}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open && <div className="px-4 py-4">{children}</div>}
+    </div>
+  );
+}
+
+// ============================================================
+// BAGIAN 1: KAMUS LABEL
+// ============================================================
+
 const RATIO_LABELS = {
-  eps: "EPS (Laba per Lembar)", // Earning per Share
-  per: "PER (Harga / Laba)", // Price to Earning Ratio
-  pe: "PER (Harga / Laba)", // alias dari backend kadang pakai "pe"
-  pbv: "PBV (Harga / Nilai Buku)", // Price to Book Value
-  roe: "ROE (Return on Equity)", // profitabilitas terhadap ekuitas
+  eps: "EPS (Laba per Lembar)",
+  per: "PER (Harga / Laba)",
+  pe: "PER (Harga / Laba)",
+  pbv: "PBV (Harga / Nilai Buku)",
+  roe: "ROE (Return on Equity)",
 };
 
-// dict raw data — nama variabel koding -> istilah keuangan bahasa Indonesia
 const RAW_DATA_LABELS = {
-  currentPrice: "Harga Saat Ini", // harga pasar terakhir
-  bookValuePerShare: "Nilai Buku per Saham", // book value
-  revenue: "Pendapatan (Revenue)", // total penjualan
-  netIncome: "Laba Bersih", // net income
-  totalAssets: "Total Aset", // total assets
-  totalEquity: "Total Ekuitas", // total equity
-  marketCap: "Kapitalisasi Pasar", // market cap
-  price_to_book: "PBV (Harga / Nilai Buku)", // jaga-jaga kalau ada varian snake_case
-  trailing_pe: "PER Trailing", // PE trailing 12 bulan
+  currentPrice: "Harga Saat Ini",
+  bookValuePerShare: "Nilai Buku per Saham",
+  revenue: "Pendapatan (Revenue)",
+  netIncome: "Laba Bersih",
+  totalAssets: "Total Aset",
+  totalEquity: "Total Ekuitas",
+  marketCap: "Kapitalisasi Pasar",
+  price_to_book: "PBV (Harga / Nilai Buku)",
+  trailing_pe: "PER Trailing",
 };
 
-// helper ambil label ramah manusia dari key mentah
+const RAW_DATA_CONTEXT = {
+  currentPrice:      "Harga pasar saham saat ini. Dipakai sebagai pembagi dalam PER dan PBV.",
+  bookValuePerShare: "Nilai aset bersih per lembar saham. Dasar perhitungan PBV.",
+  revenue:           "Total pendapatan sebelum dikurangi biaya. Bukan laba hanya ukuran skala bisnis.",
+  netIncome:         "Laba bersih setelah semua biaya. Inilah yang dibagi jadi EPS dan ROE.",
+  totalAssets:       "Seluruh aset yang dimiliki perusahaan kas, piutang, properti, dll.",
+  totalEquity:       "Modal sendiri (aset dikurangi utang). Dasar perhitungan ROE dan PBV.",
+  marketCap:         "Total nilai pasar perusahaan = harga saham × jumlah saham beredar.",
+  price_to_book:     "Sama dengan PBV harga saham dibanding nilai buku per saham.",
+  trailing_pe:       "PER berbasis laba 12 bulan terakhir (trailing twelve months).",
+};
+
 const prettyLabel = (key, dict) => {
-  if (!key) return "-"; // jaga-jaga null
-  const clean = String(key).trim(); // rapihin spasi
-  if (dict[clean]) return dict[clean]; // ketemu di dict -> pake
-  if (dict[clean.toLowerCase()]) return dict[clean.toLowerCase()]; // fallback lowercase
-  return clean // belum ada di dict -> ubah camelCase jadi spasi
-    .replace(/([A-Z])/g, " $1") // sisip spasi sebelum huruf kapital
-    .replace(/_/g, " ") // snake_case jadi spasi
-    .replace(/\b\w/g, (c) => c.toUpperCase()) // title case tiap kata
-    .trim(); // trim akhir
+  if (!key) return "-";
+  const clean = String(key).trim();
+  if (dict[clean]) return dict[clean];
+  if (dict[clean.toLowerCase()]) return dict[clean.toLowerCase()];
+  return clean
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
 };
 
-// set key rasio yang SUDAH muncul di kartu atas — biar nggak dobel di tabel bawah
 const RATIOS_IN_TOP_CARDS = new Set(["eps", "per", "pe", "pbv", "roe"]);
 
-// opsi timeframe — biar label lebih jelas buat user
 const TIMEFRAME_OPTIONS = [
-  {
-    key: "1D",
-    label: "1D",
-    desc: "1 Hari",
-    hint: "Menampilkan data harga 1 hari terakhir",
-  },
-  {
-    key: "7D",
-    label: "7D",
-    desc: "7 Hari",
-    hint: "Menampilkan data harga 7 hari terakhir",
-  },
-  {
-    key: "1M",
-    label: "1M",
-    desc: "1 Bulan",
-    hint: "Menampilkan data harga 1 bulan terakhir",
-  },
+  { key: "1D", label: "1D", desc: "1 Hari",   hint: "Menampilkan data harga 1 hari terakhir" },
+  { key: "7D", label: "7D", desc: "7 Hari",   hint: "Menampilkan data harga 7 hari terakhir" },
+  { key: "1M", label: "1M", desc: "1 Bulan",  hint: "Menampilkan data harga 1 bulan terakhir" },
 ];
 
-// helper label human-readable untuk timeframe aktif
 function getTimeframeDescription(timeframe) {
   if (timeframe === "1D") return "1 hari terakhir";
   if (timeframe === "7D") return "7 hari terakhir";
@@ -103,85 +129,70 @@ function getTimeframeDescription(timeframe) {
 // BAGIAN 2: HELPER FORMAT ANGKA + TANGGAL
 // ============================================================
 
-// format ke Rupiah, fallback 0 kalau bukan angka
 const fmtIDR = (n) =>
   Number.isFinite(Number(n))
     ? `Rp ${Math.round(Number(n)).toLocaleString("id-ID")}`
     : "Rp 0";
 
-// format angka harga tanpa prefix Rp (buat OHLC / chart summary)
 const fmtPrice = (n) => {
   const num = Number(n);
   if (!Number.isFinite(num)) return "0";
-
-  // paksa bulat seperti fmtIDR
-  const rounded = Math.round(num);
-
-  return rounded.toLocaleString("id-ID");
+  return Math.round(num).toLocaleString("id-ID");
 };
 
-// format persen 1 angka di belakang koma
 const fmtPct = (n) =>
   Number.isFinite(Number(n)) ? `${Number(n).toFixed(1)}%` : "0.0%";
 
-// parse string tanggal ke Date (toleran format)
 function parseDate(value) {
-  if (!value) return null; // kosong -> null
-
-  const raw = String(value).trim(); // normalisasi jadi string + trim
-
-  // format "YYYY-MM-DD" murni -> rakit manual biar timezone aman
+  if (!value) return null;
+  const raw = String(value).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [y, m, d] = raw.split("-").map(Number); // pecah jadi angka
-    return new Date(y, m - 1, d); // bulan 0-based
+    const [y, m, d] = raw.split("-").map(Number);
+    return new Date(y, m - 1, d);
   }
-
-  // format ada waktu -> pastiin pake "T"
   const norm = raw.includes("T") ? raw : raw.replace(" ", "T");
-  const dt = new Date(norm); // konstruksi Date
-  return Number.isNaN(dt.getTime()) ? null : dt; // invalid -> null
+  const dt = new Date(norm);
+  return Number.isNaN(dt.getTime()) ? null : dt;
 }
 
-// format tanggal doang
-function fmtDate(value) {
-  const d = parseDate(value); // parse dulu
-  if (!d) return value || "-"; // gagal -> raw atau dash
+function fmtVolume(n) {
+  const num = Number(n);
+  if (!Number.isFinite(num) || num === 0) return "0";
+  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(2)}B`;
+  if (num >= 1_000_000)     return `${(num / 1_000_000).toFixed(2)}M`;
+  if (num >= 1_000)         return `${(num / 1_000).toFixed(2)}K`;
+  return String(num);
+}
 
+function fmtDate(value) {
+  const d = parseDate(value);
+  if (!d) return value || "-";
   return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit", // tanggal 2 digit
-    month: "short", // bulan singkat (Jan, Feb...)
-    year: "numeric", // tahun 4 digit
+    day: "2-digit", month: "short", year: "numeric",
   }).format(d);
 }
 
-// format tanggal + jam
 function fmtDateTime(value) {
-  const d = parseDate(value); // parse
-  if (!d) return value || "-"; // gagal -> raw
-
+  const d = parseDate(value);
+  if (!d) return value || "-";
   return (
     new Intl.DateTimeFormat("id-ID", {
-      day: "2-digit", // tgl
-      month: "short", // bulan
-      year: "numeric", // thn
-      hour: "2-digit", // jam
-      minute: "2-digit", // menit
-    }).format(d) + " WIB" // append zona waktu
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    }).format(d) + " WIB"
   );
 }
 
-// pilih format berdasar timeframe (1D butuh jam, lainnya cukup tgl)
 function fmtChartUpdate(value, timeframe) {
-  if (!value) return "-"; // kosong
+  if (!value) return "-";
   return timeframe === "1D" ? fmtDateTime(value) : fmtDate(value);
 }
 
-// label interval grafik
 function fmtChartIntervalLabel(interval, timeframe) {
-  if (timeframe === "1D") return "Per jam"; // 1 hari -> per jam
-  if (timeframe === "7D") return "Per hari (7 hari)"; // seminggu
-  if (timeframe === "1M") return "Per hari (1 bulan)"; // sebulan
-  return interval || "-"; // fallback
+  if (timeframe === "1D") return "Per jam";
+  if (timeframe === "7D") return "Per hari (7 hari)";
+  if (timeframe === "1M") return "Per hari (1 bulan)";
+  return interval || "-";
 }
 
 // ============================================================
@@ -189,49 +200,45 @@ function fmtChartIntervalLabel(interval, timeframe) {
 // ============================================================
 
 export default function StockDetail() {
-  const { ticker = "" } = useParams(); // ambil ticker dari URL (contoh: /stocks/BBCA)
+  const { ticker = "" } = useParams();
 
-  // --- state lokal ---
-  const [timeframe, setTimeframe] = useState("1D"); // pilihan rentang grafik
-  const [tab, setTab] = useState("deskripsi"); // tab aktif
-  const [loading, setLoading] = useState(true); // loading halaman awal
-  const [chartLoading, setChartLoading] = useState(false); // loading khusus chart
-  const [predicting, setPredicting] = useState(false); // loading prediksi
-  const [loadingFund, setLoadingFund] = useState(false); // loading fundamental
+  const [timeframe,    setTimeframe]    = useState("1D");
+  const [tab,          setTab]          = useState("deskripsi");
+  const [loading,      setLoading]      = useState(true);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [predicting,   setPredicting]   = useState(false);
+  const [loadingFund,  setLoadingFund]  = useState(false);
 
-  const [stockData, setStockData] = useState(null); // bundle detail saham
-  const [prediction, setPrediction] = useState(null); // hasil prediksi ML
-  const [fundamentals, setFundamentals] = useState(null); // data fundamental detail
+  const [stockData,    setStockData]    = useState(null);
+  const [prediction,   setPrediction]   = useState(null);
+  const [fundamentals, setFundamentals] = useState(null);
 
-  // fetch detail utama — hanya saat ticker berubah
   useEffect(() => {
-    setTab("deskripsi"); // reset tab hanya saat pindah ticker
-    setPrediction(null); // opsional reset data per ticker
-    setFundamentals(null); // opsional reset data per ticker
+    setTab("deskripsi");
+    setPrediction(null);
+    setFundamentals(null);
 
     (async () => {
-      setLoading(true); // mulai loading halaman awal
+      setLoading(true);
       try {
         const detail = await apiFetch(`/stocks/${ticker}/detail?timeframe=1D`);
-
         if (detail.ok && detail.data?.success) {
           const next = detail.data.data || {};
           next.chart = next.chart || [];
           next.chartMeta = next.chartMeta || null;
-          setStockData(next); // simpan base detail
+          setStockData(next);
         } else {
-          setStockData(null); // gagal -> kosongin
+          setStockData(null);
         }
       } catch (e) {
-        console.error("fetch detail error:", e); // log buat debug
-        setStockData(null); // error -> kosong
+        console.error("fetch detail error:", e);
+        setStockData(null);
       } finally {
-        setLoading(false); // selesai loading awal
+        setLoading(false);
       }
     })();
   }, [ticker]);
 
-  // fetch chart saja — saat ticker atau timeframe berubah
   useEffect(() => {
     if (!ticker) return;
 
@@ -241,189 +248,162 @@ export default function StockDetail() {
         const chart = await apiFetch(
           `/stocks/${ticker}/candlestick?timeframe=${timeframe}`
         );
-
         setStockData((prev) => {
           if (!prev) return prev;
-
           return {
             ...prev,
-            chart:
-              chart.ok && chart.data?.success
-                ? chart.data.data || []
-                : [],
-            chartMeta:
-              chart.ok && chart.data?.success
-                ? {
-                    source: chart.data.source || "yfinance",
-                    latestDate: chart.data.latestDate || null,
-                    latestUpdated: chart.data.latestUpdated || null,
-                    interval: chart.data.interval || "60m",
-                  }
-                : null,
+            chart: chart.ok && chart.data?.success ? chart.data.data || [] : [],
+            chartMeta: chart.ok && chart.data?.success
+              ? {
+                  source:        chart.data.source || "yfinance",
+                  latestDate:    chart.data.latestDate || null,
+                  latestUpdated: chart.data.latestUpdated || null,
+                  interval:      chart.data.interval || "60m",
+                }
+              : null,
           };
         });
       } catch (e) {
         console.error("fetch chart error:", e);
-        setStockData((prev) =>
-          prev
-            ? {
-                ...prev,
-                chart: [],
-                chartMeta: null,
-              }
-            : prev
-        );
+        setStockData((prev) => prev ? { ...prev, chart: [], chartMeta: null } : prev);
       } finally {
         setChartLoading(false);
       }
     })();
   }, [ticker, timeframe]);
 
-  // handler tombol prediksi AI
   const handlePredict = async () => {
-    if (!ticker) return; // guard kalau ticker kosong
-    setPredicting(true); // spinner tombol nyala
-
+    if (!ticker) return;
+    setPredicting(true);
     try {
-      const r = await apiFetch(`/stocks/${ticker}/prediction`); // hit endpoint ML
-      setPrediction(r.ok && r.data?.success ? r.data.data : null); // simpan hasil
+      const r = await apiFetch(`/stocks/${ticker}/prediction`);
+      setPrediction(r.ok && r.data?.success ? r.data.data : null);
     } finally {
-      setPredicting(false); // spinner tombol mati
+      setPredicting(false);
     }
   };
 
-  // handler tombol load fundamental
   const handleFundamentals = async () => {
-    if (!ticker) return; // guard
-    setLoadingFund(true); // spinner on
-
+    if (!ticker) return;
+    setLoadingFund(true);
     try {
-      const r = await apiFetch(`/stocks/${ticker}/fundamentals`); // hit endpoint
-      setFundamentals(r.ok && r.data?.success ? r.data.data : null); // simpan
+      const r = await apiFetch(`/stocks/${ticker}/fundamentals`);
+      setFundamentals(r.ok && r.data?.success ? r.data.data : null);
     } finally {
-      setLoadingFund(false); // spinner off
+      setLoadingFund(false);
     }
   };
 
-  // --- destructure data buat shortcut ---
-  const profile = stockData?.profile || {}; // profil perusahaan
-  const fundamental = stockData?.fundamental || {}; // fundamental ringkas (dari detail)
-  const chart = stockData?.chart || []; // array candle
-  const chartMeta = stockData?.chartMeta || {}; // metadata chart
+  const profile    = stockData?.profile    || {};
+  const fundamental = stockData?.fundamental || {};
+  const chart      = stockData?.chart      || [];
+  const chartMeta  = stockData?.chartMeta  || {};
 
-  // konversi data chart ke tipe number (jaga-jaga backend kirim string)
   const candles = useMemo(
-    () =>
-      chart.map((c) => ({
-        t: String(c.t), // label waktu
-        open: Number(c.open), // harga open
-        high: Number(c.high), // harga tertinggi
-        low: Number(c.low), // harga terendah
-        close: Number(c.close), // harga close
-      })),
-    [chart] // recompute kalau chart berubah
+    () => chart.map((c) => ({
+      t:      String(c.t),
+      open:   Number(c.open),
+      high:   Number(c.high),
+      low:    Number(c.low),
+      close:  Number(c.close),
+      volume: Number(c.volume) || 0,
+    })),
+    [chart]
   );
 
-  const first = candles[0] || { open: 0 }; // candle pertama (acuan awal)
-  const last = candles[candles.length - 1] || { close: 0 }; // candle terakhir
-
-  // selisih harga periode ini
+  const first = candles[0]                        || { open: 0 };
+  const last  = candles[candles.length - 1]       || { close: 0 };
   const change = Number(last.close || 0) - Number(first.open || 0);
-  // persentase perubahan (hindari bagi nol)
-  const pct =
-    Number(first.open || 0) === 0
-      ? 0
-      : (change / Number(first.open || 0)) * 100;
-  const isUp = change >= 0; // naik apa turun
+  const pct    = Number(first.open || 0) === 0
+    ? 0
+    : (change / Number(first.open || 0)) * 100;
+  const isUp   = change >= 0;
 
-  // --- data prediksi AI ---
-  const closeToday = prediction?.current_price || Number(last.close || 0); // harga sekarang
-  const closeTodayDate = prediction?.current_price_date || "-"; // tgl harga sekarang
-  const predClose = prediction?.predicted_close_next_day || closeToday; // prediksi besok
-  const predDelta = predClose - closeToday; // selisih prediksi
-
-  // persentase perubahan prediksi (fallback hitung manual)
-  const pricePredPct =
-    prediction?.price_expected_change_pct ??
+  const closeToday     = prediction?.current_price || Number(last.close || 0);
+  const closeTodayDate = prediction?.current_price_date || "-";
+  const predClose      = prediction?.predicted_close_next_day || closeToday;
+  const predDelta      = predClose - closeToday;
+  const pricePredPct   = prediction?.price_expected_change_pct ??
     (closeToday === 0 ? 0 : (predDelta / closeToday) * 100);
 
-  const mape = prediction?.mape || 0; // error rata-rata model
-  const fundamentalPrediction = prediction?.fundamental_prediction || {}; // hasil skor fundamental
-  const fundamentalReturn3M = Number(
-    fundamentalPrediction?.estimated_return_pct_3m || 0 // estimasi return 3 bulan
-  );
-  const fundamentalDirection = fundamentalPrediction?.direction_3m || "Netral"; // arah naik/turun
-  const recommendation = fundamentalPrediction?.recommendation || "HOLD"; // BUY/HOLD/SELL
+  const mape                    = prediction?.mape || 0;
+  const fundamentalPrediction   = prediction?.fundamental_prediction || {};
+  const fundamentalReturn3M     = Number(fundamentalPrediction?.estimated_return_pct_3m || 0);
+  const fundamentalDirection    = fundamentalPrediction?.direction_3m    || "Netral";
+  const recommendation          = fundamentalPrediction?.recommendation  || "HOLD";
+  const fundamentalRuleHits     = fundamentalPrediction?.rule_hits        || [];
+  const fundamentalScoringMode  = fundamentalPrediction?.scoring_mode     || "";
+  const fundamentalSectorBenchmark = fundamentalPrediction?.sector_benchmark || {};
+  const fundamentalImpliedPrice = fundamentalPrediction?.implied_fair_price_3m || null;
+  const fundamentalRawScore     = fundamentalPrediction?.raw_score ?? null;
 
-  // varian badge sesuai rekomendasi
-  const recVariant =
-    recommendation === "BUY"
-      ? "success" // hijau
-      : recommendation === "HOLD"
-      ? "warning" // kuning
-      : "danger"; // merah
+  const fundamentalExplanation = useMemo(() => {
+    if (!fundamentalPrediction || Object.keys(fundamentalPrediction).length === 0) return "";
+    const mode  = fundamentalScoringMode;
+    const bm    = fundamentalSectorBenchmark;
+    const ret   = fundamentalReturn3M;
+    const score = fundamentalRawScore;
+    const parts = [];
+    if (mode === "relative_sector" && bm?.sector) {
+      parts.push(`Skor dihitung relatif terhadap median ${bm.sample_size} saham di sektor "${bm.sector}".`);
+    } else if (mode === "absolute_fallback") {
+      parts.push("Data benchmark sektor belum cukup skor dihitung menggunakan threshold standar.");
+    }
+    if (score !== null) {
+      parts.push(`Raw score: ${score >= 0 ? "+" : ""}${Number(score).toFixed(4)}.`);
+    }
+    parts.push(`Estimasi return: ${ret >= 0 ? "+" : ""}${ret.toFixed(2)}%.`);
+    parts.push(
+      recommendation === "BUY"  ? "Rekomendasi BUY karena estimasi return >= 5%."  :
+      recommendation === "SELL" ? "Rekomendasi SELL karena estimasi return <= -5%." :
+                                  "Rekomendasi HOLD karena estimasi return di antara -5% dan 5%."
+    );
+    return parts.join(" ");
+  }, [fundamentalPrediction, fundamentalScoringMode, fundamentalSectorBenchmark, fundamentalReturn3M, fundamentalRawScore, recommendation]);
 
-  // FIX: class pill rekomendasi — pake dark: variant biar kontras di light mode
   const recommendationPillClass =
-    recommendation === "BUY"
-      ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-      : recommendation === "HOLD"
-      ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
-      : "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300";
+    recommendation === "BUY"  ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+    recommendation === "HOLD" ? "border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"         :
+                                "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300";
 
-  // data rasio + raw dari response fundamentals
-  const fundamentalsRatios = fundamentals?.fundamentals?.ratios || {};
+  const fundamentalsRatios  = fundamentals?.fundamentals?.ratios  || {};
   const fundamentalsRawData = fundamentals?.fundamentals?.rawData || {};
-  const benchmarks = fundamental?.benchmarks || {}; // nilai acuan industri
 
-  // FIX: filter rasio yang SUDAH ditampilin di kartu atas biar tabel bawah nggak dobel
   const extraRatios = useMemo(() => {
-    const entries = Object.entries(fundamentalsRatios); // ubah objek -> array pair
-    return entries.filter(([key]) => !RATIOS_IN_TOP_CARDS.has(key.toLowerCase())); // skip key yg sudah dipake
+    return Object.entries(fundamentalsRatios)
+      .filter(([key]) => !RATIOS_IN_TOP_CARDS.has(key.toLowerCase()));
   }, [fundamentalsRatios]);
 
-  // hitung kesimpulan valuasi (Murah / Wajar / Mahal)
   const valuation = useMemo(() => {
-    const perTTM = Number(fundamental?.perTTM || 0); // PER aktual
-    const pbv = Number(fundamental?.pbv || 0); // PBV aktual
-    const roe = Number(fundamental?.roe || 0); // ROE aktual
+    const perTTM   = Number(fundamental?.perTTM || 0);
+    const pbv      = Number(fundamental?.pbv    || 0);
+    const roe      = Number(fundamental?.roe    || 0);
+    const perBench = Number(fundamentalSectorBenchmark?.per_median ?? 0);
+    const pbvBench = Number(fundamentalSectorBenchmark?.pbv_median ?? 0);
+    const roeBench = Number(fundamentalSectorBenchmark?.roe_median ?? 0);
 
-    const perBench = Number(benchmarks?.per || 0); // benchmark PER industri
-    const pbvBench = Number(benchmarks?.pbv || 0); // benchmark PBV
-    const roeBench = Number(benchmarks?.roe || 0); // benchmark ROE
+    if (!perBench && !pbvBench && !roeBench) return { label: null, tone: "none" };
 
-    // sinyal murah: PER & PBV di bawah benchmark + ROE di atas benchmark
     const cheapSignal =
-      perBench > 0 &&
-      pbvBench > 0 &&
-      roeBench > 0 &&
-      perTTM <= perBench &&
-      pbv <= pbvBench &&
-      roe >= roeBench;
+      perBench > 0 && pbvBench > 0 && roeBench > 0 &&
+      perTTM <= perBench && pbv <= pbvBench && roe >= roeBench;
 
     if (cheapSignal) return { label: "Cenderung Murah", tone: "good" };
 
-    // sinyal mahal: PER atau PBV 10% lebih tinggi dari benchmark
     if (
-      perBench > 0 &&
-      pbvBench > 0 &&
-      (perTTM >= perBench * 1.1 || pbv >= pbvBench * 1.1)
-    ) {
-      return { label: "Cenderung Mahal", tone: "bad" };
-    }
+      (perBench > 0 && perTTM >= perBench * 1.1) ||
+      (pbvBench > 0 && pbv   >= pbvBench * 1.1)
+    ) return { label: "Cenderung Mahal", tone: "bad" };
 
-    return { label: "Wajar", tone: "mid" }; // default
-  }, [fundamental, benchmarks]); // recompute kalau data berubah
+    return { label: "Wajar", tone: "mid" };
+  }, [fundamental, fundamentalSectorBenchmark]);
 
-  // FIX: warna pill valuasi — tambah dark: variant biar teks jelas di light mode
   const valuationClass =
-    valuation.tone === "good"
-      ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-      : valuation.tone === "bad"
-      ? "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300"
-      : "border-slate-500/30 bg-slate-500/15 text-slate-700 dark:text-slate-300";
+    valuation.tone === "good" ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
+    valuation.tone === "bad"  ? "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-300"                 :
+    valuation.tone === "none" ? "border-border/50 bg-muted/20 text-muted-foreground"                             :
+                                "border-slate-500/30 bg-slate-500/15 text-slate-700 dark:text-slate-300";
 
-  // --- render kondisional: loading ---
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20">
@@ -432,7 +412,6 @@ export default function StockDetail() {
     );
   }
 
-  // --- render kondisional: data nggak ketemu ---
   if (!stockData) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-20 text-center text-muted-foreground">
@@ -447,10 +426,12 @@ export default function StockDetail() {
     );
   }
 
-  // --- render utama halaman ---
+  // ============================================================
+  // RENDER UTAMA
+  // ============================================================
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-      {/* link balik ke list saham */}
+
       <Link
         to="/stocks"
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -459,104 +440,55 @@ export default function StockDetail() {
         Kembali ke daftar saham
       </Link>
 
-      {/* HEADER — logo + nama + harga */}
+      {/* HEADER */}
       <Card className="p-6 sm:p-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-5">
-            {/* logo otomatis (lihat StockLogo.jsx) */}
-            <StockLogo
-              ticker={ticker}
-              website={profile.website}
-              logoUrl={profile.logo_url}
-              size="xl"
-            />
+            <StockLogo ticker={ticker} website={profile.website} logoUrl={profile.logo_url} size="xl" />
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                  {ticker}
-                </h1>
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{ticker}</h1>
                 <Badge variant="outline">{profile.sector || "—"}</Badge>
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {profile.shortName || profile.longName || "-"}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {profile.industry || "-"}
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{profile.shortName || profile.longName || "-"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{profile.industry || "-"}</p>
             </div>
           </div>
-
-          {/* harga terakhir + perubahan */}
           <div className="text-right">
-            <p className="text-3xl font-bold tracking-tight sm:text-4xl">
-              {fmtIDR(last.close)}
-            </p>
+            <p className="text-3xl font-bold tracking-tight sm:text-4xl">{fmtIDR(last.close)}</p>
             <div className="mt-1 flex items-center justify-end gap-2">
-              {isUp ? (
-                <TrendingUp className="h-4 w-4 text-success" />
-              ) : (
-                <TrendingDown className="h-4 w-4 text-danger" />
-              )}
-              <span
-                className={cn(
-                  "text-sm font-medium",
-                  isUp ? "text-success" : "text-danger"
-                )}
-              >
-                {isUp ? "+" : ""}
-                {fmtIDR(change)} ({fmtPct(pct)})
+              {isUp
+                ? <TrendingUp   className="h-4 w-4 text-success" />
+                : <TrendingDown className="h-4 w-4 text-danger" />}
+              <span className={cn("text-sm font-medium", isUp ? "text-success" : "text-danger")}>
+                {isUp ? "+" : ""}{fmtIDR(change)} ({fmtPct(pct)})
               </span>
             </div>
           </div>
         </div>
 
-        {/* OHLC ringkas */}
         <div className="mt-6 grid grid-cols-2 gap-4 text-center md:grid-cols-5">
-          <InfoBox label="Open" value={fmtPrice(first.open || 0)} />
-          <InfoBox
-            label="High"
-            value={fmtPrice(
-              candles.length ? Math.max(...candles.map((c) => c.high)) : 0
-            )}
-          />
-          <InfoBox
-            label="Low"
-            value={fmtPrice(
-              candles.length ? Math.min(...candles.map((c) => c.low)) : 0
-            )}
-          />
-          <InfoBox label="Close" value={fmtPrice(last.close || 0)} />
-          <div>
-          <p className="text-xs text-muted-foreground">Perubahan</p>
-          <p
-            className={cn(
-              "mt-1 text-lg font-bold",
-              change >= 0 ? "text-success" : "text-danger"
-            )}
-          >
-            {change >= 0 ? "+" : "-"}
-            {fmtPrice(Math.abs(change))} ({fmtPct(pct)})
-          </p>
-        </div>
+          <InfoBox label="Open"   value={fmtPrice(first.open || 0)} />
+          <InfoBox label="High"   value={fmtPrice(candles.length ? Math.max(...candles.map((c) => c.high)) : 0)} />
+          <InfoBox label="Low"    value={fmtPrice(candles.length ? Math.min(...candles.map((c) => c.low))  : 0)} />
+          <InfoBox label="Close"  value={fmtPrice(last.close || 0)} />
+          <InfoBox label="Volume" value={fmtVolume(candles.length ? candles.reduce((s, c) => s + (c.volume || 0), 0) : 0)} />
         </div>
       </Card>
 
-      {/* TOMBOL RENTANG WAKTU */}
+      {/* TOMBOL TIMEFRAME */}
       <Card className="p-4 sm:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <CalendarRange className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold text-foreground">
-                Rentang waktu grafik
-              </p>
+              <p className="text-sm font-semibold text-foreground">Rentang waktu grafik</p>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Pilih periode untuk mengubah tampilan data harga pada grafik.
               Saat ini menampilkan {getTimeframeDescription(timeframe)}.
             </p>
           </div>
-
           <div
             className="inline-flex w-full flex-wrap gap-2 rounded-2xl border border-border bg-muted/30 p-1.5 md:w-auto"
             role="tablist"
@@ -579,9 +511,7 @@ export default function StockDetail() {
               >
                 <div className="flex flex-col leading-tight">
                   <span className="text-sm font-semibold">{tf.label}</span>
-                  <span className="mt-0.5 text-[11px] opacity-80">
-                    {tf.desc}
-                  </span>
+                  <span className="mt-0.5 text-[11px] opacity-80">{tf.desc}</span>
                 </div>
               </button>
             ))}
@@ -593,18 +523,12 @@ export default function StockDetail() {
       <Card className="p-6">
         <p className="text-xs text-muted-foreground">
           Source: {chartMeta.source || "yfinance"} • Interval:{" "}
-          {fmtChartIntervalLabel(chartMeta.interval, timeframe)} • Update
-          terbaru:{" "}
-          {fmtChartUpdate(
-            chartMeta.latestUpdated || chartMeta.latestDate,
-            timeframe
-          )}
+          {fmtChartIntervalLabel(chartMeta.interval, timeframe)} • Update terbaru:{" "}
+          {fmtChartUpdate(chartMeta.latestUpdated || chartMeta.latestDate, timeframe)}
         </p>
         <p className="mt-1 text-xs text-warning">
-          Data ini bukan harga realtime dan grafik hanya visualisasi historis
-          dari yfinance.
+          Data ini bukan harga realtime dan grafik hanya visualisasi historis dari yfinance.
         </p>
-
         <div className="relative mt-4 h-80 md:h-[420px]">
           {chartLoading ? (
             <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-background/70 backdrop-blur-[1px]">
@@ -623,18 +547,17 @@ export default function StockDetail() {
       {/* TAB SWITCHER */}
       <div className="flex flex-wrap gap-2">
         {[
-          { k: "deskripsi", label: "Profil", icon: Building2 },
-          { k: "prediksi", label: "Prediksi AI", icon: Brain },
-          { k: "fundamental", label: "Fundamental", icon: Sparkles },
+          { k: "deskripsi",   label: "Profil",       icon: Building2 },
+          { k: "prediksi",    label: "Prediksi AI",  icon: Brain     },
+          { k: "fundamental", label: "Fundamental",  icon: Sparkles  },
         ].map((t) => {
-          const Icon = t.icon; // komponen ikon
+          const Icon = t.icon;
           return (
             <button
               key={t.k}
               onClick={() => {
-                setTab(t.k); // ganti tab
-                // lazy-load data hanya saat tab pertama kali dibuka
-                if (t.k === "prediksi" && !prediction) handlePredict();
+                setTab(t.k);
+                if (t.k === "prediksi"    && !prediction)   handlePredict();
                 if (t.k === "fundamental" && !fundamentals) handleFundamentals();
               }}
               className={cn(
@@ -652,21 +575,18 @@ export default function StockDetail() {
         })}
       </div>
 
-      {/* TAB 1: DESKRIPSI PERUSAHAAN */}
+      {/* ============================================================ */}
+      {/* TAB 1: PROFIL PERUSAHAAN                                     */}
+      {/* ============================================================ */}
       {tab === "deskripsi" && (
         <Card className="p-6 sm:p-8">
           <h3 className="mb-4 text-lg font-semibold">Profil Perusahaan</h3>
-
           <dl className="mb-6 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-            <Meta label="Nama" value={profile.longName || profile.shortName || "-"} />
-            <Meta label="Sektor" value={profile.sector || "-"} />
+            <Meta label="Nama"    value={profile.longName || profile.shortName || "-"} />
+            <Meta label="Sektor"  value={profile.sector   || "-"} />
             <Meta label="Industri" value={profile.industry || "-"} />
-            <Meta
-              label="Lokasi"
-              value={[profile.city, profile.country].filter(Boolean).join(", ") || "-"}
-            />
+            <Meta label="Lokasi"  value={[profile.city, profile.country].filter(Boolean).join(", ") || "-"} />
           </dl>
-
           {profile.website && (
             <a
               href={profile.website}
@@ -678,169 +598,313 @@ export default function StockDetail() {
               {String(profile.website).replace(/^https?:\/\//, "")}
             </a>
           )}
-
           <div>
             <p className="mb-2 text-sm font-medium">Tentang perusahaan</p>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {profile.longBusinessSummary ||
-                "Deskripsi perusahaan belum tersedia."}
+            <p className="text-sm leading-relaxed text-justify text-muted-foreground">
+              {profile.longBusinessSummary || "Deskripsi perusahaan belum tersedia."}
             </p>
           </div>
         </Card>
       )}
 
-      {/* TAB 2: PREDIKSI AI */}
+      {/* ============================================================ */}
+      {/* TAB 2: PREDIKSI AI                                           */}
+      {/* ============================================================ */}
       {tab === "prediksi" && (
         <Card className="p-6 sm:p-8">
           {predicting && !prediction ? (
             <Spinner label="Menjalankan model harga dan analisis fundamental..." />
           ) : !prediction ? (
-            <div className="py-8 text-center">
-              <Brain className="mx-auto mb-3 h-10 w-10 text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Klik tombol di bawah buat narik prediksi AI.
+            <div className="py-12 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary-soft">
+                <Brain className="h-7 w-7 text-primary" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Analisis AI belum dijalankan</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Klik tombol di bawah untuk memulai prediksi harga dan analisis fundamental.
               </p>
-              <Button
-                variant="gradient"
-                className="mt-4"
-                onClick={handlePredict}
-                disabled={predicting}
-              >
+              <Button variant="gradient" className="mt-5" onClick={handlePredict} disabled={predicting}>
                 {predicting ? "Memprediksi..." : "Mulai Prediksi"}
               </Button>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* judul hasil */}
+
+              {/* JUDUL HASIL */}
               <div className="rounded-xl border border-primary/20 bg-primary-soft px-6 py-4 text-center">
-                <h2 className="text-lg font-bold md:text-xl">
-                  Hasil Prediksi Harga Closing Besok (Day Trading) dan Arah Tren Jangka Menengah (Swing)
+                <h2 className="text-base font-bold leading-snug text-foreground md:text-lg">
+                  Hasil Prediksi Harga Penutupan Besok{" "}
+                  <span className="text-muted-foreground font-normal">(Day Trading)</span>
+                  {" "}dan Arah Tren Jangka Menengah{" "}
+                  <span className="text-muted-foreground font-normal">(Swing)</span>
                 </h2>
               </div>
 
-              {/* kartu harga prediksi + akurasi */}
+              {/* HARGA PREDIKSI + AKURASI */}
               <div className="grid gap-4 lg:grid-cols-3">
-                <Card className="p-5 lg:col-span-2">
-                  <h3 className="mb-4 text-base font-semibold">
-                    Harga Perkiraan Closing
-                  </h3>
 
-                  <div className="space-y-3 text-sm">
-                    <Row label="Close terakhir (data model)" value={fmtIDR(closeToday)} />
-                    <Row label="Tanggal close (data model)" value={closeTodayDate} />
-                    <Row label="Prediksi closing besok" value={fmtIDR(predClose)} />
-                    <Row
-                      label="Selisih terhadap close data model"
+                {/* Kartu harga prediksi */}
+                <Card className="p-5 lg:col-span-2">
+                  <h3 className="mb-4 text-base font-semibold text-foreground">
+                    Harga Perkiraan Penutupan Besok
+                  </h3>
+                  <div className="divide-y divide-border/60">
+                    <PredRow label="Harga close terakhir (data model)"      value={fmtIDR(closeToday)} />
+                    <PredRow label="Tanggal harga close (data model)"       value={closeTodayDate} />
+                    <PredRow label="Prediksi penutupan besok"           value={fmtIDR(predClose)} highlight />
+                    <PredRow
+                      label="Selisih terhadap harga close data model"
                       value={
-                        <span
-                          className={cn(
-                            "font-bold",
-                            predDelta >= 0 ? "text-success" : "text-danger"
-                          )}
-                        >
-                          {predDelta >= 0 ? "+" : ""}
-                          {fmtIDR(predDelta)} ({pricePredPct >= 0 ? "+" : ""}
-                          {Number(pricePredPct).toFixed(2)}%)
+                        <span className={cn("font-bold tabular-nums", predDelta >= 0 ? "text-success" : "text-danger")}>
+                          {predDelta >= 0 ? "+" : ""}{fmtIDR(predDelta)}{" "}
+                          <span className="font-normal text-sm">
+                            ({pricePredPct >= 0 ? "+" : ""}{Number(pricePredPct).toFixed(2)}%)
+                          </span>
                         </span>
                       }
                     />
                   </div>
                 </Card>
 
+                {/* Kartu akurasi */}
                 <Card className="p-5">
-                  <h3 className="mb-4 text-base font-semibold">Akurasi Prediksi</h3>
-
-                  <div className="space-y-3 text-sm">
-                    <Row
+                  <h3 className="mb-4 text-base font-semibold text-foreground">Akurasi Model</h3>
+                  <div className="divide-y divide-border/60">
+                    <PredRow
                       label="MAPE"
-                      value={<span className="font-semibold">{mape.toFixed(2)}%</span>}
+                      value={<span className="font-semibold tabular-nums">{mape.toFixed(2)}%</span>}
                     />
-                    <Row label="Waktu Prediksi" value={prediction?.prediction_date || "-"} />
+                    <PredRow label="Waktu Prediksi" value={prediction?.prediction_date || "-"} />
                   </div>
 
-                  <div className="mt-4 rounded-lg border border-border/70 bg-muted/20 p-4 text-xs leading-relaxed text-muted-foreground">
-                    <p className="font-medium text-foreground">Cara baca akurasi</p>
-                    <p className="mt-1">
-                      Semakin kecil nilai MAPE, semakin dekat hasil prediksi
-                      model terhadap data aktual historis.
-                    </p>
+                  {/* Cara membaca MAPE → accordion */}
+                  <div className="mt-4">
+                    <Accordion title="Cara membaca MAPE" icon="📖">
+                      <p className="text-xs leading-relaxed text-justify text-muted-foreground">
+                        Semakin kecil nilai MAPE, semakin dekat hasil prediksi model
+                        terhadap data aktual historis.
+                      </p>
+                    </Accordion>
                   </div>
                 </Card>
               </div>
 
-              {/* rekomendasi fundamental */}
-              <Card className="p-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Rekomendasi (analisis fundamental)
-                    </p>
-                    <p className="text-lg font-bold">{recommendation}</p>
-                  </div>
-                  <Badge variant={recVariant}>{fundamentalDirection}</Badge>
+              {/* REKOMENDASI FUNDAMENTAL */}
+              <Card className="p-5 sm:p-6">
+                {/* Header kartu */}
+                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <h3 className="text-base font-semibold text-foreground">
+                    Rekomendasi Analisis Fundamental
+                  </h3>
+                  {fundamentalScoringMode && (
+                    <span className="inline-flex shrink-0 items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                      {fundamentalScoringMode === "relative_sector"
+                        ? `📊 Relatif vs Sektor (n=${fundamentalSectorBenchmark?.sample_size ?? "?"})`
+                        : "📋 Threshold Standar"}
+                    </span>
+                  )}
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Stat
-                    label="Return (fundamental)"
+                {/* 4 METRIK UTAMA */}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <MetricCard
+                    label="Estimasi Return"
                     value={`${fundamentalReturn3M >= 0 ? "+" : ""}${fundamentalReturn3M.toFixed(2)}%`}
                     tone={fundamentalReturn3M >= 0 ? "success" : "danger"}
                   />
-                  <Card className="p-4">
-                    <p className="text-xs text-muted-foreground">Arah (fundamental)</p>
-                    <p
-                      className={cn(
-                        "mt-1 text-lg font-bold",
-                        fundamentalDirection === "Naik"
-                          ? "text-success"
-                          : "text-danger"
-                      )}
-                    >
-                      {fundamentalDirection}
-                    </p>
-                  </Card>
-                  <Card className="p-4">
-                    <p className="text-xs text-muted-foreground">Rekomendasi fundamental</p>
-                    <span
-                      className={cn(
-                        "mt-2 inline-flex rounded-full border px-3 py-1 text-sm font-semibold",
-                        recommendationPillClass
-                      )}
-                    >
-                      {recommendation}
-                    </span>
-                  </Card>
+                  <MetricCard
+                    label="Arah Tren"
+                    value={fundamentalDirection}
+                    tone={fundamentalDirection === "Naik" ? "success" : "danger"}
+                  />
+                  <MetricCard
+                    label="Rekomendasi Berdasarkan Skor Fundamental"
+                    value={
+                      <span className={cn("inline-flex rounded-full border px-3 py-1 text-sm font-semibold", recommendationPillClass)}>
+                        {recommendation}
+                      </span>
+                    }
+                  />
+                  <MetricCard
+                    label="Perkiraan Harga"
+                    value={fundamentalImpliedPrice ? fmtIDR(fundamentalImpliedPrice) : "—"}
+                  />
                 </div>
+
+                {/* BENCHMARK SEKTORAL */}
+                {fundamentalScoringMode === "relative_sector" && fundamentalSectorBenchmark?.sector && (
+                  <div className="mt-5">
+                    <Accordion
+                      title={`Benchmark Median Sektor: ${fundamentalSectorBenchmark.sector}`}
+                      icon="📊"
+                    >
+                      <div className="space-y-4">
+                        <p className="text-xs text-muted-foreground">
+                          Banyak saham di sektor ini:{" "}
+                          <span className="font-medium text-foreground">{fundamentalSectorBenchmark.sample_size} saham</span>
+                        </p>
+
+                        {/* 4 kotak median */}
+                        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                          {[
+                            { label: "Median EPS", val: fundamentalSectorBenchmark.eps_median },
+                            { label: "Median ROE", val: fundamentalSectorBenchmark.roe_median, pct: true },
+                            { label: "Median PBV", val: fundamentalSectorBenchmark.pbv_median },
+                            { label: "Median PER", val: fundamentalSectorBenchmark.per_median },
+                          ].map(({ label, val, pct }) => (
+                            <div key={label} className="rounded-lg border border-border/50 bg-background p-3 text-center">
+                              <p className="text-muted-foreground">{label}</p>
+                              <p className="mt-1 font-semibold text-foreground tabular-nums">
+                                {val != null
+                                  ? pct
+                                    ? `${Number(val).toFixed(2)}%`
+                                    : Number(val).toLocaleString("id-ID", { maximumFractionDigits: 2 })
+                                  : "—"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Interpretasi valuasi */}
+                        {valuation.label && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-background p-3">
+                              <div>
+                                <p className="text-xs font-medium text-foreground">Interpretasi Valuasi</p>
+                                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                                  Berdasarkan perbandingan PER, PBV, dan ROE terhadap median sektor.
+                                </p>
+                              </div>
+                              <span className={cn("shrink-0 rounded-full border px-3 py-1 text-sm font-semibold", valuationClass)}>
+                                {valuation.label}
+                              </span>
+                            </div>
+
+                            {/* Catatan kenapa EPS tidak masuk valuasi → accordion */}
+                            <Accordion title="Kenapa EPS tidak masuk interpretasi valuasi?" icon="💡">
+                              <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
+                                EPS adalah angka absolut dalam rupiah sehingga tidak bisa langsung
+                                dibandingkan antar saham. EPS bank besar dan EPS startup bisa berbeda
+                                ribuan kali lipat tanpa berarti salah satunya lebih "murah". Label valuasi
+                                menggunakan PER karena PER sudah memperhitungkan EPS relatif terhadap
+                                harga saham, lebih adil untuk perbandingan lintas saham.
+                              </p>
+                            </Accordion>
+                          </div>
+                        )}
+                      </div>
+                    </Accordion>
+                  </div>
+                )}
+
+                {/* DETAIL SKOR PER RASIO */}
+                {fundamentalRuleHits.length > 0 && (
+                  <div className="mt-5">
+                    <Accordion title="Detail Skor per Rasio" icon="📋">
+                      <div className="overflow-x-auto rounded-xl border border-border/60">
+                        <table className="w-full min-w-[520px] text-xs">
+                          <thead>
+                            <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                              <th className="px-3 py-2.5 font-medium">Rasio</th>
+                              <th className="px-3 py-2.5 font-medium">Kondisi</th>
+                              <th className="px-3 py-2.5 font-medium">Skor</th>
+                              {fundamentalRuleHits[0]?.z_score !== undefined && (
+                                <th className="px-3 py-2.5 font-medium">Z-Skor</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {fundamentalRuleHits.map((hit, i) => (
+                              <tr key={i} className="border-b border-border/50 last:border-0">
+                                <td className="px-3 py-2.5 font-semibold">{hit.feature}</td>
+                                <td className="px-3 py-2.5 text-muted-foreground">{hit.reason}</td>
+                                <td className={cn(
+                                  "px-3 py-2.5 font-semibold tabular-nums",
+                                  Number(hit.weight) >= 0 ? "text-success" : "text-danger"
+                                )}>
+                                  {Number(hit.weight) >= 0 ? "+" : ""}
+                                  {Number(hit.weight).toFixed(3)}
+                                </td>
+                                {hit.z_score !== undefined && (
+                                  <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
+                                    {Number(hit.z_score).toFixed(2)}
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t bg-muted/20">
+                              <td className="px-3 py-2.5 font-semibold" colSpan={2}>Raw Score Total</td>
+                              <td className={cn(
+                                "px-3 py-2.5 font-bold tabular-nums",
+                                (fundamentalRawScore ?? 0) >= 0 ? "text-success" : "text-danger"
+                              )}>
+                                {fundamentalRawScore != null
+                                  ? `${Number(fundamentalRawScore) >= 0 ? "+" : ""}${Number(fundamentalRawScore).toFixed(4)}`
+                                  : "—"}
+                              </td>
+                              {fundamentalRuleHits[0]?.z_score !== undefined && <td />}
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </Accordion>
+                  </div>
+                )}
+
+                {/* PENJELASAN METODOLOGI → accordion */}
+                {fundamentalExplanation && (
+                  <div className="mt-4">
+                    <Accordion title="Metodologi Perhitungan" icon="🔬">
+                      <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
+                        {fundamentalExplanation}{" "}
+                        Sistem ini menilai saham menggunakan empat rasio utama: EPS, PER, PBV, dan ROE.
+                        Setiap rasio dibandingkan dengan median sektor, hasilnya diukur menggunakan Z-Score,
+                        yaitu seberapa jauh nilai saham ini dari rata-rata perusahaan lain di sektor yang sama.
+                        Dari Z-Score tersebut, setiap rasio mendapat skor: positif kalau kondisinya lebih baik
+                        dari rata-rata sektor, negatif kalau di bawahnya.
+                        Semua skor dijumlahkan menjadi Raw Score Total, lalu dikonversi menjadi estimasi return
+                        dalam persen untuk jangka menengah.
+                        Jika estimasi return ≥ 5% maka rekomendasinya <strong className="text-emerald-700 dark:text-emerald-400">BUY</strong>,{" "}
+                        ≤ −5% maka <strong className="text-red-700 dark:text-red-400">SELL</strong>,
+                        dan di antaranya <strong className="text-amber-700 dark:text-amber-400">HOLD</strong>.
+                      </p>
+                    </Accordion>
+                  </div>
+                )}
               </Card>
 
-              {/* disclaimer */}
+              {/* DISCLAIMER */}
               <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                <p className="text-xs leading-relaxed text-foreground">
-                  Disclaimer: prediksi menggunakan histori harga penutupan dan
-                  analisis fundamental. Hasil bukan kepastian dan bukan ajakan
-                  membeli atau menjual saham.
+                <p className="text-xs leading-relaxed text-justify text-foreground">
+                  <span className="font-medium">Disclaimer:</span> Hasil prediksi ini bukan
+                  merupakan kepastian dan bukan merupakan ajakan untuk membeli atau menjual saham.
+                  Selalu lakukan riset mandiri sebelum mengambil keputusan investasi.
                 </p>
               </div>
+
             </div>
           )}
         </Card>
       )}
 
-      {/* TAB 3: FUNDAMENTAL */}
+      {/* ============================================================ */}
+      {/* TAB 3: FUNDAMENTAL                                           */}
+      {/* ============================================================ */}
       {tab === "fundamental" && (
         <Card className="p-6 sm:p-8">
           {!fundamentals && !loadingFund && (
-            <div className="py-8 text-center">
-              <Sparkles className="mx-auto mb-3 h-10 w-10 text-primary" />
-              <p className="text-sm text-muted-foreground">
-                Data fundamental belum dimuat.
+            <div className="py-12 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary-soft">
+                <Sparkles className="h-7 w-7 text-primary" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Data fundamental belum dimuat</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Klik tombol di bawah untuk mengambil data laporan keuangan saham ini.
               </p>
-              <Button
-                variant="primary"
-                className="mt-4"
-                onClick={handleFundamentals}
-              >
+              <Button variant="primary" className="mt-5" onClick={handleFundamentals}>
                 Muat Data Fundamental
               </Button>
             </div>
@@ -850,130 +914,188 @@ export default function StockDetail() {
 
           {fundamentals && (
             <div className="space-y-6">
-              {/* 4 KARTU UTAMA (EPS, PER, PBV, ROE) — tetap tampil di atas */}
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Stat
-                  label="EPS"
-                  value={formatFundValue(fundamentalsRatios.eps ?? fundamental?.eps)}
-                />
-                <Stat
-                  label="PER"
-                  value={formatFundValue(
-                    fundamentalsRatios.per ?? fundamentalsRatios.pe ?? fundamental?.perTTM
-                  )}
-                />
-                <Stat
-                  label="PBV"
-                  value={formatFundValue(fundamentalsRatios.pbv ?? fundamental?.pbv)}
-                />
-                <Stat
-                  label="ROE"
-                  value={formatFundValue(fundamentalsRatios.roe ?? fundamental?.roe, true)}
-                />
+
+              {/* 4 KARTU RASIO EDUKATIF */}
+              <div>
+                <h3 className="mb-3 text-base font-semibold text-foreground">Rasio Utama</h3>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <RatioCard
+                    label="EPS"
+                    fullName="Earning Per Share"
+                    value={formatFundValue(fundamentalsRatios.eps ?? fundamental?.eps)}
+                    description="Laba bersih yang dihasilkan per lembar saham. Nilai positif artinya perusahaan untung. Makin tinggi makin baik."
+                    hint="Dihitung dari Net Income ÷ jumlah saham beredar. Ini adalah angka laba paling dasar dari sebuah saham."
+                    good={(fundamentalsRatios.eps ?? fundamental?.eps) > 0}
+                  />
+                  <RatioCard
+                    label="PER"
+                    fullName="Price to Earnings Ratio"
+                    value={formatFundValue(
+                      fundamentalsRatios.per ?? fundamentalsRatios.pe ?? fundamental?.perTTM
+                    )}
+                    description="Berapa kali investor bersedia membayar dibanding laba perusahaan. PER rendah bisa berarti murah, PER tinggi bisa berarti premium atau diekspektasi tumbuh pesat."
+                    hint="Dihitung dari Harga Saham ÷ EPS. PER < 15× umumnya dianggap value, 15–25× wajar, > 25× premium."
+                    good={(() => {
+                      const v = Number(
+                        fundamentalsRatios.per ??
+                        fundamentalsRatios.pe ??
+                        fundamental?.perTTM
+                      );
+                      return v > 0 && v <= 25;
+                    })()}
+                  />
+                  <RatioCard
+                    label="PBV"
+                    fullName="Price to Book Value"
+                    value={formatFundValue(fundamentalsRatios.pbv ?? fundamental?.pbv)}
+                    description="Perbandingan harga saham terhadap nilai buku aset perusahaan. PBV di bawah 1× bisa berarti saham undervalued harga lebih murah dari nilai aset bersihnya."
+                    hint="Dihitung dari Harga Saham ÷ Nilai Buku per Saham (Total Ekuitas ÷ jumlah saham). Wajar untuk growth stock di kisaran 1–3×."
+                    good={(() => {
+                      const v = Number(fundamentalsRatios.pbv ?? fundamental?.pbv);
+                      return v > 0 && v <= 3;
+                    })()}
+                  />
+                  <RatioCard
+                    label="ROE"
+                    fullName="Return on Equity"
+                    value={formatFundValue(
+                      fundamentalsRatios.roe ??
+                      fundamentals?.fundamentals?.ratios?.roe ??
+                      fundamental?.roe,
+                      true
+                    )}
+                    description="Seberapa efisien perusahaan menghasilkan laba dari modal sendiri. Makin tinggi artinya manajemen makin produktif memutar uang pemegang saham."
+                    hint="Dihitung dari Net Income ÷ Total Ekuitas. ROE ≥ 15% dianggap sehat dan kompetitif di pasar Indonesia."
+                    good={Number(
+                      fundamentalsRatios.roe ??
+                      fundamentals?.fundamentals?.ratios?.roe ??
+                      fundamental?.roe
+                    ) >= 15}
+                  />
+                </div>
               </div>
 
-              {/* RINGKASAN VALUASI + LABEL WARNA FIXED */}
-              <Card className="p-5">
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <h3 className="text-base font-semibold">Ringkasan Valuasi</h3>
-                  <span
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-sm font-semibold",
-                      valuationClass // <- udah dark:variant, jadi jelas di light & dark
-                    )}
-                  >
-                    {valuation.label}
-                  </span>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-3">
-                  <MiniInfo
-                    label="Benchmark PER"
-                    value={formatFundValue(benchmarks?.per)}
-                  />
-                  <MiniInfo
-                    label="Benchmark PBV"
-                    value={formatFundValue(benchmarks?.pbv)}
-                  />
-                  <MiniInfo
-                    label="Benchmark ROE"
-                    value={formatFundValue(benchmarks?.roe, true)}
-                  />
-                </div>
-              </Card>
-
-              {/* TABEL RASIO EXTRA — hanya yang belum ada di kartu atas (FIX duplikasi) */}
-              {extraRatios.length > 0 && (
-                <Card className="p-5">
-                  <h3 className="mb-4 text-base font-semibold">
-                    Rasio Fundamental Tambahan
-                  </h3>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[560px] text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-muted-foreground">
-                          <th className="px-3 py-2 font-medium">Metrik</th>
-                          <th className="px-3 py-2 font-medium">Nilai</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {extraRatios.map(([k, v]) => (
-                          <tr key={k} className="border-b border-border/60">
-                            {/* pake prettyLabel biar dict rasio jalan */}
-                            <td className="px-3 py-2 font-medium">
-                              {prettyLabel(k, RATIO_LABELS)}
-                            </td>
-                            <td className="px-3 py-2">
-                              {formatFundValue(v, k.toLowerCase() === "roe")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* KENAPA 4 RASIO INI → accordion */}
+              <Accordion title="Kenapa fokus ke EPS, PER, PBV, dan ROE?" icon="🧠">
+                <div className="space-y-4">
+                  <p className="text-xs leading-relaxed text-justify text-muted-foreground">
+                    Empat rasio ini dipilih sebagai fondasi utama karena paling stabil untuk membaca
+                    laba, valuasi, dan efisiensi di banyak saham BEI. Bukan karena rasio lain tidak
+                    penting DER, ROA, NPM pun sering dipakai. Namun dari banyak studi dan
+                    konsistensi lintas sektor di BEI, EPS, PER, PBV, dan ROE cenderung paling sering
+                    menunjukkan pengaruh signifikan terhadap harga maupun return. Rasio lain kadang
+                    sangat bergantung pada sektor tertentu (misalnya perbankan vs manufaktur),
+                    sehingga menambah kompleksitas tanpa selalu meningkatkan akurasi keputusan.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {[
+                      {
+                        rasio: "EPS",
+                        alasan: "Sinyal paling langsung apakah perusahaan benar-benar menghasilkan laba untuk pemegang saham.",
+                      },
+                      {
+                        rasio: "PER",
+                        alasan: "Mengukur apakah pasar menghargai laba perusahaan terlalu mahal, wajar, atau murah.",
+                      },
+                      {
+                        rasio: "PBV",
+                        alasan: "Membandingkan harga pasar dengan nilai buku aset berguna membaca apakah saham undervalued atau overvalued.",
+                      },
+                      {
+                        rasio: "ROE",
+                        alasan: "Menilai efisiensi manajemen mengelola modal sendiri historis kuat untuk kualitas bisnis jangka menengah.",
+                      },
+                    ].map(({ rasio, alasan }) => (
+                      <div key={rasio} className="rounded-lg border border-border/50 bg-muted/10 p-3">
+                        <p className="mb-1 text-xs font-semibold text-foreground">{rasio}</p>
+                        <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">{alasan}</p>
+                      </div>
+                    ))}
                   </div>
-                </Card>
-              )}
+                  <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-3">
+                    <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
+                      💡 <span className="font-medium text-foreground">Intinya:</span>{" "}
+                      Dashboard ini memprioritaskan rasio yang paling informatif, konsisten, dan
+                      mudah dibandingkan lintas saham Indonesia supaya analisis lebih sederhana
+                      tanpa kehilangan inti kualitas bisnis.
+                    </p>
+                  </div>
+                </div>
+              </Accordion>
 
-              {/* TABEL DATA MENTAH — FIX: label key mentah jadi bahasa manusia */}
-              <Card className="p-5">
-                <h3 className="mb-4 text-base font-semibold">Data Mentah</h3>
+              {/* CATATAN HUBUNGAN RASIO → RAW DATA → accordion */}
+              <Accordion title="Dari mana angka-angka ini berasal?" icon="🔗">
+                <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
+                  <p>
+                    <span className="font-medium text-foreground">EPS</span> dihitung dari{" "}
+                    <span className="font-medium text-foreground">Laba Bersih (Net Income)</span>{" "}
+                    dibagi jumlah saham beredar.
+                  </p>
+                  <p>
+                    <span className="font-medium text-foreground">PER</span> dihitung dari
+                    harga saham saat ini dibagi EPS jadi EPS adalah bahan baku PER.
+                  </p>
+                  <p>
+                    <span className="font-medium text-foreground">PBV</span> dihitung dari
+                    harga saham dibagi{" "}
+                    <span className="font-medium text-foreground">Nilai Buku per Saham</span>,
+                    yang berasal dari{" "}
+                    <span className="font-medium text-foreground">Total Ekuitas</span>.
+                  </p>
+                  <p>
+                    <span className="font-medium text-foreground">ROE</span> dihitung dari{" "}
+                    <span className="font-medium text-foreground">Net Income</span> dibagi{" "}
+                    <span className="font-medium text-foreground">Total Ekuitas</span>.
+                  </p>
+                  <p className="pt-2 mt-1 border-t border-border/40">
+                    Angka mentah lengkap (Revenue, Net Income, Total Aset, dll)
+                    tersedia di tabel Data Mentah di bawah.
+                  </p>
+                </div>
+              </Accordion>
 
-                <div className="overflow-x-auto">
+              {/* TABEL DATA MENTAH */}
+              <Card className="p-5 sm:p-6">
+                <h3 className="mb-1 text-base font-semibold text-foreground">Data Mentah</h3>
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Angka-angka laporan keuangan yang menjadi dasar perhitungan rasio di atas.
+                </p>
+                <div className="overflow-x-auto rounded-xl border border-border/60">
                   <table className="w-full min-w-[640px] text-sm">
                     <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="px-3 py-2 font-medium">Keterangan</th>
-                        <th className="px-3 py-2 font-medium">Nilai</th>
+                      <tr className="border-b bg-muted/30 text-left text-muted-foreground">
+                        <th className="px-4 py-3 font-medium">Keterangan</th>
+                        <th className="px-4 py-3 font-medium text-right">Nilai</th>
+                        <th className="px-4 py-3 text-xs font-medium">Kaitannya dengan rasio</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(fundamentalsRawData).length ? (
                         Object.entries(fundamentalsRawData).map(([k, v]) => (
-                          <tr key={k} className="border-b border-border/60">
-                            {/* label sekarang manusiawi */}
-                            <td className="px-3 py-2 font-medium">
-                              {prettyLabel(k, RAW_DATA_LABELS)}
+                          <tr key={k} className="border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors">
+                            <td className="px-4 py-3 font-medium">{prettyLabel(k, RAW_DATA_LABELS)}</td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">{formatRawValue(k, v)}</td>
+                            <td className="px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+                              {RAW_DATA_CONTEXT[k] || "—"}
                             </td>
-                            <td className="px-3 py-2">{formatRawValue(k, v)}</td>
                           </tr>
                         ))
                       ) : (
-                        // fallback kalau backend nggak ngasih rawData
                         <>
-                          <RawRow labelKey="currentPrice" value={fundamental?.currentPrice} />
-                          <RawRow labelKey="bookValuePerShare" value={fundamental?.bookValuePerShare} />
-                          <RawRow labelKey="revenue" value={fundamental?.revenue} />
-                          <RawRow labelKey="netIncome" value={fundamental?.netIncome} />
-                          <RawRow labelKey="totalAssets" value={fundamental?.totalAssets} />
-                          <RawRow labelKey="totalEquity" value={fundamental?.totalEquity} />
-                          <RawRow labelKey="marketCap" value={fundamental?.marketCap} />
+                          <RawRow labelKey="currentPrice"      value={fundamental?.currentPrice} />
+                          <RawRow labelKey="bookValuePerShare"  value={fundamental?.bookValuePerShare} />
+                          <RawRow labelKey="revenue"            value={fundamental?.revenue} />
+                          <RawRow labelKey="netIncome"          value={fundamental?.netIncome} />
+                          <RawRow labelKey="totalAssets"        value={fundamental?.totalAssets} />
+                          <RawRow labelKey="totalEquity"        value={fundamental?.totalEquity} />
+                          <RawRow labelKey="marketCap"          value={fundamental?.marketCap} />
                         </>
                       )}
                     </tbody>
                   </table>
                 </div>
               </Card>
+
             </div>
           )}
         </Card>
@@ -983,10 +1105,9 @@ export default function StockDetail() {
 }
 
 // ============================================================
-// BAGIAN 4: SUB-KOMPONEN KECIL
+// BAGIAN 4: SUB-KOMPONEN
 // ============================================================
 
-// meta label + value (dipakai di section profil)
 function Meta({ label, value }) {
   return (
     <div>
@@ -996,35 +1117,87 @@ function Meta({ label, value }) {
   );
 }
 
-// kartu angka + label (EPS/PER/PBV/ROE)
-function Stat({ label, value, tone }) {
+// Baris prediksi — dipakai di tab Prediksi
+function PredRow({ label, value, highlight }) {
   return (
-    <Card className="p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p
-        className={cn(
-          "mt-1 text-lg font-bold",
-          tone === "success" && "text-success", // hijau kalau positif
-          tone === "danger" && "text-danger" // merah kalau negatif
-        )}
-      >
+    <div className={cn(
+      "flex items-start justify-between gap-4 py-3",
+      highlight && "rounded-lg bg-primary-soft/40 px-3 -mx-3"
+    )}>
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={cn("text-right text-sm font-medium", highlight && "font-semibold text-foreground")}>
         {value}
-      </p>
-    </Card>
-  );
-}
-
-// baris horizontal label-value (dipakai di kartu prediksi)
-function Row({ label, value }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-border/60 pb-3 last:border-b-0 last:pb-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value}</span>
+      </span>
     </div>
   );
 }
 
-// kotak info kecil (OHLC)
+// Kartu metrik ringkas — dipakai di grid 4 metrik prediksi
+function MetricCard({ label, sublabel, value, tone }) {
+  return (
+    <Card className="p-4">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      {sublabel && <p className="mt-0.5 text-[10px] text-muted-foreground/60">{sublabel}</p>}
+      <div className={cn(
+        "mt-2 text-lg font-bold leading-tight",
+        tone === "success" && "text-success",
+        tone === "danger"  && "text-danger",
+        !tone              && "text-foreground"
+      )}>
+        {value}
+      </div>
+    </Card>
+  );
+}
+
+// Kartu rasio EDUKATIF — dipakai di tab Fundamental
+function RatioCard({ label, fullName, value, description, hint, good }) {
+  const isGood = good === true;
+  const isBad  = good === false;
+
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      {/* header: nama + indikator */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+          <p className="text-[10px] text-muted-foreground/60">{fullName}</p>
+        </div>
+        <span className={cn(
+          "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+          isGood
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : isBad
+            ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+            : "border-border/50 bg-muted/20 text-muted-foreground"
+        )}>
+          {isGood ? "✓ Baik" : isBad ? "✗ Perhatikan" : "—"}
+        </span>
+      </div>
+
+      {/* nilai utama */}
+      <p className={cn(
+        "text-2xl font-bold tabular-nums",
+        isGood ? "text-success" : isBad ? "text-danger" : "text-foreground"
+      )}>
+        {value}
+      </p>
+
+      {/* penjelasan + cara hitung → accordion */}
+      <Accordion title="Penjelasan & Cara Hitung">
+        <div className="space-y-2">
+          <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
+            {description}
+          </p>
+          <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+            <p className="text-[10px] leading-relaxed text-muted-foreground">💡 {hint}</p>
+          </div>
+        </div>
+      </Accordion>
+    </Card>
+  );
+}
+
 function InfoBox({ label, value }) {
   return (
     <div>
@@ -1034,56 +1207,42 @@ function InfoBox({ label, value }) {
   );
 }
 
-// kartu benchmark (PER, PBV, ROE industri)
-function MiniInfo({ label, value }) {
-  return (
-    <div className="rounded-xl border border-border/70 p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 text-base font-semibold">{value}</p>
-    </div>
-  );
-}
-
-// baris tabel raw data fallback
+// Baris fallback untuk raw data kalau backend tidak kirim rawData
 function RawRow({ labelKey, value }) {
   return (
-    <tr className="border-b border-border/60">
-      {/* labelKey diubah jadi bahasa manusia */}
-      <td className="px-3 py-2 font-medium">{prettyLabel(labelKey, RAW_DATA_LABELS)}</td>
-      <td className="px-3 py-2">{formatRawValue(labelKey, value)}</td>
+    <tr className="border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors">
+      <td className="px-4 py-3 font-medium">{prettyLabel(labelKey, RAW_DATA_LABELS)}</td>
+      <td className="px-4 py-3 text-right font-mono tabular-nums">{formatRawValue(labelKey, value)}</td>
+      <td className="px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+        {RAW_DATA_CONTEXT[labelKey] || "—"}
+      </td>
     </tr>
   );
 }
 
-// format angka rasio (persen atau biasa)
 function formatFundValue(value, isPercent = false) {
-  if (value === null || value === undefined || value === "") return "-"; // kosong
-  const num = Number(value); // coba jadi angka
-  if (!Number.isFinite(num)) return String(value); // bukan angka -> cetak apa adanya
-  if (isPercent) return `${num.toFixed(2)}%`; // tambah simbol %
-  return num.toLocaleString("id-ID", { maximumFractionDigits: 2 }); // format ribuan
+  if (value === null || value === undefined || value === "") return "—";
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  if (isPercent) return `${num.toFixed(2)}%`;
+  return num.toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }
 
-// format nilai raw — auto detect Rupiah atau angka biasa
 function formatRawValue(key, value) {
-  if (value === null || value === undefined || value === "") return "-";
-
+  if (value === null || value === undefined || value === "") return "—";
   const lowerKey = String(key || "").toLowerCase();
   const num = Number(value);
-
   if (!Number.isFinite(num)) return String(value);
-
   if (
-    lowerKey.includes("price") ||
-    lowerKey.includes("cap") ||
-    lowerKey.includes("revenue") ||
-    lowerKey.includes("income") ||
-    lowerKey.includes("assets") ||
-    lowerKey.includes("equity") ||
+    lowerKey.includes("price")     ||
+    lowerKey.includes("cap")       ||
+    lowerKey.includes("revenue")   ||
+    lowerKey.includes("income")    ||
+    lowerKey.includes("assets")    ||
+    lowerKey.includes("equity")    ||
     lowerKey.includes("bookvalue")
   ) {
     return `Rp ${Math.round(num).toLocaleString("id-ID")}`;
   }
-
   return num.toLocaleString("id-ID", { maximumFractionDigits: 2 });
 }

@@ -1,42 +1,43 @@
-# Import library jwt untuk encode & decode token
+# Import library jwt untuk encode/decode token
 import jwt
 
 # Import datetime untuk mengatur waktu expired token
 from datetime import datetime, timedelta, timezone
 
-# Import current_app untuk akses config Flask
+# Import current_app untuk ambil config Flask
 from flask import current_app
 
 
 def generate_jwt(user):
     """
-    Fungsi untuk membuat JWT token berdasarkan data user.
+    Membuat JWT token untuk user.
 
-    Alur:
-    1. Ambil durasi expired dari config
-    2. Hitung waktu expired
-    3. Buat payload (isi token)
-    4. Encode jadi JWT string
+    Isi token:
+    - id, username, role
+    - token_version → penting untuk invalidasi token lama
+    - exp → waktu expired token
     """
 
-    # Ambil durasi expired (dalam menit) dari config Flask
+    # Ambil durasi expired dari config
     expires_minutes = int(current_app.config["JWT_EXPIRES_MINUTES"])
 
-    # Hitung waktu expired token (UTC timezone)
+    # Hitung waktu expired
     exp_time = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
 
-    # Payload JWT (data yang akan disimpan di dalam token)
+    # Payload token
     payload = {
-        "sub": str(user.id),      # subject (standar JWT) → biasanya ID user
-        "id": user.id,            # ID user
-        "username": user.username, # username user
-        "role": "admin",          # role user (di sini hardcoded admin)
-        "exp": exp_time           # waktu expired token
+        "sub": str(user.id),
+        "id": user.id,
+        "username": user.username,
+        "role": "admin",
+
+        # 🔥 penting: untuk invalidate token lama
+        "token_version": user.token_version,
+
+        "exp": exp_time,
     }
 
-    # Encode payload menjadi JWT
-    # Menggunakan secret key dari config Flask
-    # Algoritma: HS256 (HMAC SHA-256)
+    # Encode token menggunakan secret key
     return jwt.encode(
         payload,
         current_app.config["JWT_SECRET_KEY"],
@@ -46,16 +47,14 @@ def generate_jwt(user):
 
 def decode_jwt(token):
     """
-    Fungsi untuk decode & verifikasi JWT token.
+    Decode JWT token menjadi payload.
 
-    Alur:
-    1. Decode token menggunakan secret key
-    2. Validasi signature & expiration otomatis
-    3. Return payload jika valid
+    Akan raise error jika:
+    - token expired
+    - token tidak valid
     """
-
     return jwt.decode(
         token,
-        current_app.config["JWT_SECRET_KEY"],  # secret key harus sama dengan saat encode
-        algorithms=["HS256"]                   # algoritma yang digunakan
+        current_app.config["JWT_SECRET_KEY"], # Ambil secret key dari config dan harus sama
+        algorithms=["HS256"] # algoritma yang digunakan saat encode
     )

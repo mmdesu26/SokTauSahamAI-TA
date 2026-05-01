@@ -115,7 +115,10 @@ class StockPredictionService:
             price_recommendation = "SELL"
 
         # panggil scorer fundamental buat analisis jangka menengah
-        fundamental_view = FundamentalScorer(self.config.ticker).score(current_price)
+        # sector dikirim dari route (ambil dari DB) supaya tidak perlu query yfinance lagi
+        fundamental_view = FundamentalScorer(self.config.ticker).score(
+            current_price, sector=getattr(self.config, "sector", None)
+        )
 
         # balikin response lengkap (frontend konsumsi ini)
         return {
@@ -161,17 +164,19 @@ class StockPredictionService:
         }
 
 
-def predict_stock_price(ticker, days=730, forecast_horizon=1, lag_days=15, cutoff_date=None, historical_df=None):
+def predict_stock_price(ticker, days=730, forecast_horizon=1, lag_days=15, cutoff_date=None, historical_df=None, sector=None):
     # wrapper fungsi — dipanggil dari route
     try:
         # rakit config dari parameter
         config = PriceModelConfig(
             ticker=ticker,
-            days=days,  # berapa hari history dipake (default 2 tahun)
-            forecast_horizon=forecast_horizon,  # prediksi berapa hari ke depan
-            lag_days=lag_days,  # berapa hari lag buat fitur
-            cutoff_date=cutoff_date,  # cutoff buat backtesting
+            days=days,
+            forecast_horizon=forecast_horizon,
+            lag_days=lag_days,
+            cutoff_date=cutoff_date,
+            sector=sector,
         )
+        # simpan sector di config supaya bisa diakses di predict()        
         service = StockPredictionService(config, historical_df=historical_df)
         return service.predict()  # eksekusi & balikin hasil
     except Exception as exc:  # error tak terduga

@@ -1,3 +1,4 @@
+import pandas as pd
 import yfinance as yf
 # ^ Mengimpor library yfinance dengan alias 'yf'.
 #   yfinance adalah library Python untuk mengambil data saham dari Yahoo Finance.
@@ -513,6 +514,8 @@ class YFinanceHelper:
                     "high": float(row["High"]),
                     "low": float(row["Low"]),
                     "close": float(row["Close"]),
+                    "volume": int(row["Volume"]) 
+                    if row.get("Volume") is not None and not pd.isna(row["Volume"]) else 0,
                 })
 
             # Return hasil dengan metadata tanggal.
@@ -578,6 +581,8 @@ class YFinanceHelper:
                     "high": float(row["High"]),
                     "low": float(row["Low"]),
                     "close": float(row["Close"]),
+                    "volume": int(row["Volume"]) 
+                    if row.get("Volume") is not None and not pd.isna(row["Volume"]) else 0,
                 })
 
             # Tanggal terakhir, None jika data kosong.

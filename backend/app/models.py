@@ -38,22 +38,29 @@ class User(db.Model):
     #     (kunci utama / unik, digunakan sebagai identitas baris).
     #   - autoincrement=True: nilai id otomatis bertambah 1 setiap baris baru.
 
-    username = db.Column(db.String(50), unique=True, nullable=False)
+    username = db.Column(db.String(20), unique=True, nullable=False)
     # ^ KOLOM: username
-    #   - Tipe: String dengan panjang maks 50 karakter (VARCHAR(50)).
+    #   - Tipe: String dengan panjang maks 20 karakter (VARCHAR(20)).
     #   - unique=True       : nilai harus UNIK (tidak boleh duplikat).
     #   - nullable=False    : tidak boleh NULL/kosong (WAJIB diisi).
     #   Ini adalah CONSTRAINT (batasan) di database.
 
-    name = db.Column(db.String(100), nullable=False)
-    # ^ KOLOM: name (nama lengkap user), maks 100 karakter, wajib diisi.
+    name = db.Column(db.String(35), nullable=False)
+    # ^ KOLOM: name (nama lengkap user), maks 35 karakter, wajib diisi.
 
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(65), nullable=False)
     # ^ KOLOM: password_hash
     #   Menyimpan HASIL HASH password (bukan password asli!).
-    #   Alasan pakai 255 karakter: hasil bcrypt kira-kira 60 karakter,
-    #   tapi 255 memberi ruang untuk algoritma hash lain di masa depan.
+    #   Alasan pakai 65 karakter: hasil bcrypt kira-kira 60 karakter,
+    #   tapi 65 memberi ruang untuk algoritma hash lain di masa depan.
 
+    # 🔥 Tambahan untuk invalidate token
+    token_version = db.Column(
+        db.Integer,
+        nullable=False,
+        default=0,
+        server_default="0"
+    )
     # -------------------------------------------------------------------
     # KOLOM TIMESTAMP: created_at & updated_at (AUDIT FIELDS)
     # -------------------------------------------------------------------
@@ -131,7 +138,7 @@ class Glossary(db.Model):
     # ^ Primary key, tidak perlu autoincrement eksplisit
     #   (beberapa DB otomatis auto-increment untuk PK integer).
 
-    term = db.Column(db.String(255), nullable=False, unique=True)
+    term = db.Column(db.String(25), nullable=False, unique=True)
     # ^ Istilah/kata yang didefinisikan. Unik agar tidak duplikat.
 
     definition = db.Column(db.Text, nullable=False)
@@ -153,7 +160,7 @@ class Glossary(db.Model):
     #        (beda dengan server_default yang diisi database).
     #   Nilai contoh: "literature_based", "expert_verified", dll.
 
-    verified_by = db.Column(db.String(150), nullable=True)
+    verified_by = db.Column(db.String(35), nullable=True)
     # ^ Nama orang/entitas yang memverifikasi, opsional.
 
     created_at = db.Column(db.DateTime, default=db.func.now())
@@ -202,25 +209,25 @@ class Stock(db.Model):
     ticker = db.Column(db.String(10), unique=True, nullable=False)
     # ^ Kode ticker saham, contoh "BBCA", "BBRI". Unik + wajib.
 
-    name = db.Column(db.String(150), nullable=False)
+    name = db.Column(db.String(60), nullable=False)
     # ^ Nama perusahaan, wajib.
 
-    sector = db.Column(db.String(100), nullable=False)
+    sector = db.Column(db.String(30), nullable=False)
     # ^ Sektor industri, wajib.
 
     price = db.Column(db.Numeric(15, 2), nullable=False, server_default="0")
     # ^ KOLOM: price (harga saham).
     #   - Tipe: Numeric(15, 2)
     #     => total 15 digit, 2 di antaranya desimal.
-    #     Contoh: 9999999999999.99. Dipakai untuk HARGA KARENA PRESISI
+    #     Contoh: 999999999999.99. Dipakai untuk HARGA KARENA PRESISI
     #     lebih baik daripada Float (Float bisa pembulatan tidak akurat).
     #   - server_default="0" => default di-set di database sebagai "0".
 
-    change_percent = db.Column(db.String(20), nullable=False, server_default="0.00%")
+    change_percent = db.Column(db.String(10), nullable=False, server_default="0.00%")
     # ^ Persentase perubahan sebagai STRING (karena sudah include tanda %).
     #   Contoh nilai: "+1.25%", "-0.50%".
 
-    status = db.Column(db.String(20), nullable=False, server_default="Active")
+    status = db.Column(db.String(10), nullable=False, server_default="Active")
     # ^ Status saham: "Active", "Suspended", dsb.
 
     created_at = db.Column(
@@ -283,14 +290,14 @@ class StockProfile(db.Model):
     #     => tiap stock_id hanya muncul sekali (memastikan relasi ONE-TO-ONE).
 
     # Kolom data profile perusahaan:
-    long_name = db.Column(db.String(200), nullable=False)  # Nama panjang
-    short_name = db.Column(db.String(100), nullable=True)  # Nama pendek
-    sector = db.Column(db.String(100), nullable=True)      # Sektor
-    industry = db.Column(db.String(100), nullable=True)    # Industri
+    long_name = db.Column(db.String(60), nullable=False)  # Nama panjang
+    short_name = db.Column(db.String(50), nullable=True)  # Nama pendek
+    sector = db.Column(db.String(30), nullable=True)      # Sektor
+    industry = db.Column(db.String(30), nullable=True)    # Industri
     long_business_summary = db.Column(db.Text, nullable=True)  # Deskripsi bisnis
-    website = db.Column(db.String(255), nullable=True)     # URL website
-    city = db.Column(db.String(100), nullable=True)        # Kota
-    country = db.Column(db.String(100), nullable=True)     # Negara
+    website = db.Column(db.String(60), nullable=True)     # URL website
+    city = db.Column(db.String(15), nullable=True)        # Kota
+    country = db.Column(db.String(15), nullable=True)     # Negara
 
     created_at = db.Column(
         db.DateTime, nullable=False, server_default=db.func.current_timestamp()
@@ -381,10 +388,6 @@ class StockFundamental(db.Model):
     # KOLOM BENCHMARK (Pembanding Industri)
     # -------------------------------------------------------------------
     # Digunakan untuk membandingkan rasio saham ini vs rata-rata industri.
-    benchmark_per = db.Column(db.Float, nullable=True)
-    benchmark_pbv = db.Column(db.Float, nullable=True)
-    benchmark_roe = db.Column(db.Float, nullable=True)
-    benchmark_eps = db.Column(db.Float, nullable=True)
 
     created_at = db.Column(
         db.DateTime, nullable=False, server_default=db.func.current_timestamp()
@@ -415,13 +418,6 @@ class StockFundamental(db.Model):
             "netIncome": self.net_income,
             "totalAssets": self.total_assets,
             "totalEquity": self.total_equity,
-            # NESTED DICT: mengelompokkan benchmark dalam satu object.
-            "benchmarks": {
-                "per": self.benchmark_per,
-                "pbv": self.benchmark_pbv,
-                "roe": self.benchmark_roe,
-                "eps": self.benchmark_eps,
-            },
         }
 
 
@@ -440,10 +436,10 @@ class StockPriceHistory(db.Model):
     #   PERHATIKAN: TIDAK ADA unique=True di sini.
     #   Artinya 1 stock_id bisa muncul di banyak baris (ONE-TO-MANY).
 
-    timeframe = db.Column(db.String(10), nullable=False)
+    timeframe = db.Column(db.String(5), nullable=False)
     # ^ Kerangka waktu: "7D", "1M", "1Y", dsb.
 
-    label = db.Column(db.String(50), nullable=False)
+    label = db.Column(db.String(20), nullable=False)
     # ^ Label untuk tampilan di chart, contoh tanggal "2024-01-15".
 
     # -------------------------------------------------------------------
@@ -453,6 +449,7 @@ class StockPriceHistory(db.Model):
     high_price = db.Column(db.Float, nullable=False)   # Harga tertinggi
     low_price = db.Column(db.Float, nullable=False)    # Harga terendah
     close_price = db.Column(db.Float, nullable=False)  # Harga penutupan
+    volume = db.Column(db.BigInteger, nullable=True)  # Volume transaksi harian
 
     sort_order = db.Column(db.Integer, nullable=False, default=0)
     # ^ Urutan tampilan di chart (dari awal ke akhir).
@@ -481,6 +478,7 @@ class StockPriceHistory(db.Model):
             "high": self.high_price,
             "low": self.low_price,
             "close": self.close_price,
+            "volume": self.volume,  
             "sortOrder": self.sort_order,
         }
 
@@ -500,13 +498,13 @@ class SystemLog(db.Model):
     )
     # ^ Kapan log dicatat. Otomatis diisi DB.
 
-    level = db.Column(db.String(20), nullable=False)
+    level = db.Column(db.String(10), nullable=False)
     # ^ Tingkat log: "INFO", "WARNING", "ERROR", "CRITICAL", dsb.
 
-    source = db.Column(db.String(100), nullable=False)
+    source = db.Column(db.String(60), nullable=False)
     # ^ Sumber log: nama module/service yang menghasilkan log.
 
-    message = db.Column(db.String(255), nullable=False)
+    message = db.Column(db.String(70), nullable=False)
     # ^ Pesan log singkat, wajib.
 
     details = db.Column(db.Text, nullable=True)
@@ -520,10 +518,10 @@ class SystemLog(db.Model):
     #   yang tidak terkait user spesifik (misal log dari scheduler).
 
     # Kolom AUDIT TRAIL (melacak aksi apa yang dilakukan):
-    action_type = db.Column(db.String(50), nullable=True)
+    action_type = db.Column(db.String(15), nullable=True)
     # ^ Jenis aksi: "CREATE", "UPDATE", "DELETE", "LOGIN", dsb.
 
-    entity_type = db.Column(db.String(50), nullable=True)
+    entity_type = db.Column(db.String(15), nullable=True)
     # ^ Tipe entitas yang kena aksi: "Stock", "User", "Glossary", dsb.
 
     entity_id = db.Column(db.Integer, nullable=True)
