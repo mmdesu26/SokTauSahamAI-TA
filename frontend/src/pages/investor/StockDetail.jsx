@@ -326,7 +326,7 @@ export default function StockDetail() {
   const pricePredPct   = prediction?.price_expected_change_pct ??
     (closeToday === 0 ? 0 : (predDelta / closeToday) * 100);
 
-  const mape                    = prediction?.mape || 0;
+  const rmse                    = prediction?.rmse || 0;
   const fundamentalPrediction   = prediction?.fundamental_prediction || {};
   const fundamentalReturn3M     = Number(fundamentalPrediction?.estimated_return_pct_3m || 0);
   const fundamentalDirection    = fundamentalPrediction?.direction_3m    || "Netral";
@@ -336,6 +336,9 @@ export default function StockDetail() {
   const fundamentalSectorBenchmark = fundamentalPrediction?.sector_benchmark || {};
   const fundamentalImpliedPrice = fundamentalPrediction?.implied_fair_price_3m || null;
   const fundamentalRawScore     = fundamentalPrediction?.raw_score ?? null;
+  const fundamentalDataAvailability = fundamentalPrediction?.data_availability || null;
+  const fundamentalMissingRatios = fundamentalDataAvailability?.missing_ratios || [];
+  const fundamentalInputs        = fundamentalPrediction?.fundamental_inputs || {};
 
   const fundamentalExplanation = useMemo(() => {
     if (!fundamentalPrediction || Object.keys(fundamentalPrediction).length === 0) return "";
@@ -349,6 +352,14 @@ export default function StockDetail() {
     } else if (mode === "absolute_fallback") {
       parts.push("Data benchmark sektor belum cukup skor dihitung menggunakan threshold standar.");
     }
+    if (fundamentalDataAvailability) {
+      const { available_count, total_count, missing_ratios: mr } = fundamentalDataAvailability;
+      if (mr && mr.length > 0) {
+        parts.push(`Kelengkapan data: ${available_count}/${total_count} rasio tersedia (${mr.join(", ")} tidak ada — dianggap 0).`);
+      } else {
+        parts.push(`Kelengkapan data: semua ${total_count} rasio tersedia.`);
+      }
+    }
     if (score !== null) {
       parts.push(`Raw score: ${score >= 0 ? "+" : ""}${Number(score).toFixed(4)}.`);
     }
@@ -359,7 +370,7 @@ export default function StockDetail() {
                                   "Rekomendasi HOLD karena estimasi return di antara -5% dan 5%."
     );
     return parts.join(" ");
-  }, [fundamentalPrediction, fundamentalScoringMode, fundamentalSectorBenchmark, fundamentalReturn3M, fundamentalRawScore, recommendation]);
+  }, [fundamentalPrediction, fundamentalScoringMode, fundamentalSectorBenchmark, fundamentalReturn3M, fundamentalRawScore, recommendation, fundamentalDataAvailability]);
 
   const recommendationPillClass =
     recommendation === "BUY"  ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
@@ -671,18 +682,20 @@ export default function StockDetail() {
                   <h3 className="mb-4 text-base font-semibold text-foreground">Akurasi Model</h3>
                   <div className="divide-y divide-border/60">
                     <PredRow
-                      label="MAPE"
-                      value={<span className="font-semibold tabular-nums">{mape.toFixed(2)}%</span>}
+                      label="RMSE"
+                      value={<span className="font-semibold tabular-nums">{fmtIDR(rmse)}</span>}
                     />
                     <PredRow label="Waktu Prediksi" value={prediction?.prediction_date || "-"} />
                   </div>
 
-                  {/* Cara membaca MAPE → accordion */}
+                  {/* Cara membaca RMSE → accordion */}
                   <div className="mt-4">
-                    <Accordion title="Cara membaca MAPE" icon="📖">
+                    <Accordion title="Cara membaca RMSE" icon="📖">
                       <p className="text-xs leading-relaxed text-justify text-muted-foreground">
-                        Semakin kecil nilai MAPE, semakin dekat hasil prediksi model
-                        terhadap data aktual historis.
+                        RMSE (Root Mean Squared Error) menunjukkan seberapa jauh rata-rata prediksi
+                        harga model dari harga aktual, dalam satuan Rupiah.
+                        Makin kecil nilai RMSE, makin dekat prediksi model terhadap data historis.
+                        Contoh: RMSE Rp 150 artinya rata-rata selisih prediksi dan aktual sekitar Rp 150 per saham.
                       </p>
                     </Accordion>
                   </div>
@@ -704,6 +717,24 @@ export default function StockDetail() {
                     </span>
                   )}
                 </div>
+
+                {/* BANNER RASIO TIDAK TERSEDIA */}
+                {fundamentalMissingRatios.length > 0 && (
+                  <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="text-xs leading-relaxed text-foreground">
+                      <span className="font-semibold text-amber-700 dark:text-amber-400">
+                        Data rasio tidak lengkap:
+                      </span>{" "}
+                      <span className="font-medium">{fundamentalMissingRatios.join(", ")}</span> tidak tersedia
+                      dari sumber data (yfinance) untuk saham ini — kemungkinan karena laporan keuangan
+                      terbaru belum tersedia atau saham ini belum melaporkan data tersebut.
+                      Rasio yang tidak ada dianggap 0 dalam perhitungan skor, sehingga{" "}
+                      <span className="font-medium">hasil analisis ini kurang akurat</span> dibanding
+                      saham yang datanya lengkap.
+                    </div>
+                  </div>
+                )}
 
                 {/* 4 METRIK UTAMA */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -808,30 +839,41 @@ export default function StockDetail() {
                               <th className="px-3 py-2.5 font-medium">Rasio</th>
                               <th className="px-3 py-2.5 font-medium">Kondisi</th>
                               <th className="px-3 py-2.5 font-medium">Skor</th>
-                              {fundamentalRuleHits[0]?.z_score !== undefined && (
+                              {fundamentalRuleHits.some((h) => h.z_score !== undefined && h.z_score !== null) && (
                                 <th className="px-3 py-2.5 font-medium">Z-Skor</th>
                               )}
                             </tr>
                           </thead>
                           <tbody>
-                            {fundamentalRuleHits.map((hit, i) => (
-                              <tr key={i} className="border-b border-border/50 last:border-0">
-                                <td className="px-3 py-2.5 font-semibold">{hit.feature}</td>
-                                <td className="px-3 py-2.5 text-muted-foreground">{hit.reason}</td>
-                                <td className={cn(
-                                  "px-3 py-2.5 font-semibold tabular-nums",
-                                  Number(hit.weight) >= 0 ? "text-success" : "text-danger"
+                            {fundamentalRuleHits.map((hit, i) => {
+                              const w = Number(hit.weight);
+                              const isNoData = w === 0 && String(hit.reason).includes("tidak tersedia");
+                              const hasZScore = fundamentalRuleHits.some((h) => h.z_score !== undefined && h.z_score !== null);
+                              return (
+                                <tr key={i} className={cn(
+                                  "border-b border-border/50 last:border-0",
+                                  isNoData ? "bg-muted/20" : ""
                                 )}>
-                                  {Number(hit.weight) >= 0 ? "+" : ""}
-                                  {Number(hit.weight).toFixed(3)}
-                                </td>
-                                {hit.z_score !== undefined && (
-                                  <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
-                                    {Number(hit.z_score).toFixed(2)}
+                                  <td className="px-3 py-2.5 font-semibold">{hit.feature}</td>
+                                  <td className={cn("px-3 py-2.5", isNoData ? "text-muted-foreground italic" : "text-muted-foreground")}>
+                                    {hit.reason}
                                   </td>
-                                )}
-                              </tr>
-                            ))}
+                                  <td className={cn(
+                                    "px-3 py-2.5 font-semibold tabular-nums",
+                                    isNoData
+                                      ? "text-muted-foreground"
+                                      : w >= 0 ? "text-success" : "text-danger"
+                                  )}>
+                                    {isNoData ? "—" : `${w >= 0 ? "+" : ""}${w.toFixed(3)}`}
+                                  </td>
+                                  {hasZScore && (
+                                    <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
+                                      {hit.z_score != null ? Number(hit.z_score).toFixed(2) : "—"}
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })}
                           </tbody>
                           <tfoot>
                             <tr className="border-t bg-muted/20">
@@ -844,7 +886,7 @@ export default function StockDetail() {
                                   ? `${Number(fundamentalRawScore) >= 0 ? "+" : ""}${Number(fundamentalRawScore).toFixed(4)}`
                                   : "—"}
                               </td>
-                              {fundamentalRuleHits[0]?.z_score !== undefined && <td />}
+                              {fundamentalRuleHits.some((h) => h.z_score !== undefined && h.z_score !== null) && <td />}
                             </tr>
                           </tfoot>
                         </table>

@@ -115,23 +115,23 @@ class PriceModelTrainer:
 
     @staticmethod
     def calculate_mape(actual_prices, predicted_prices):
-        # fungsi statis untuk menghitung MAPE
+        # fungsi statis untuk menghitung MAPE (dipakai internal, bobot ensemble)
         # MAPE = Mean Absolute Percentage Error
-        # semakin kecil nilainya, semakin baik
 
         actual_arr = np.asarray(actual_prices, dtype=float)
-        # ubah actual prices menjadi array float
-
         pred_arr = np.asarray(predicted_prices, dtype=float)
-        # ubah predicted prices menjadi array float
-
         actual_safe = np.where(np.abs(actual_arr) < 1e-8, 1e-8, actual_arr)
-        # menghindari pembagian dengan nol
-        # kalau actual terlalu kecil, diganti 1e-8
-
         return float(np.mean(np.abs((actual_arr - pred_arr) / actual_safe)) * 100)
-        # rumus MAPE:
-        # rata-rata error persentase absolut × 100
+
+    @staticmethod
+    def calculate_rmse(actual_prices, predicted_prices):
+        # fungsi statis untuk menghitung RMSE (Root Mean Squared Error)
+        # RMSE = akar dari rata-rata kuadrat selisih prediksi dan aktual
+        # satuannya sama dengan harga (Rupiah), makin kecil makin baik
+
+        actual_arr = np.asarray(actual_prices, dtype=float)
+        pred_arr = np.asarray(predicted_prices, dtype=float)
+        return float(np.sqrt(np.mean((actual_arr - pred_arr) ** 2)))
 
     @staticmethod
     def calculate_directional_accuracy(actual_returns, predicted_returns):
@@ -377,8 +377,8 @@ class PriceModelTrainer:
                 "actual_price": actual_price,                # harga aktual
                 "predicted_price": predicted_price,          # harga prediksi
                 "baseline_price": baseline_price,            # harga baseline
-                "mape": self.calculate_mape([actual_price], [predicted_price]),  # MAPE fold
-                "baseline_mape": self.calculate_mape([actual_price], [baseline_price]),  # MAPE baseline
+                "rmse": self.calculate_rmse([actual_price], [predicted_price]),  # RMSE fold (Rp)
+                "baseline_rmse": self.calculate_rmse([actual_price], [baseline_price]),  # RMSE baseline (Rp)
                 "direction_correct": int(np.sign(actual_return) == np.sign(predicted_return)),  # arah benar?
                 "baseline_direction_correct": int(np.sign(actual_return) == np.sign(baseline_return)),  # arah baseline benar?
             })
@@ -397,11 +397,11 @@ class PriceModelTrainer:
             "window_results": results,
             # detail hasil tiap fold
 
-            "avg_mape": float(round(np.mean([r["mape"] for r in results]), 4)),
-            # rata-rata MAPE semua fold
+            "avg_rmse": float(round(np.mean([r["rmse"] for r in results]), 2)),
+            # rata-rata RMSE semua fold (Rp)
 
-            "avg_baseline_mape": float(round(np.mean([r["baseline_mape"] for r in results]), 4)),
-            # rata-rata MAPE baseline
+            "avg_baseline_rmse": float(round(np.mean([r["baseline_rmse"] for r in results]), 2)),
+            # rata-rata RMSE baseline (Rp)
 
             "directional_accuracy": float(round(np.mean([r["direction_correct"] for r in results]) * 100, 2)),
             # rata-rata akurasi arah model
@@ -458,10 +458,13 @@ class PriceModelTrainer:
         # return baseline
 
         mape = self.calculate_mape(actual_price, ensemble_pred_price)
-        # hitung MAPE model
+        # hitung MAPE model — dipakai internal untuk bobot ensemble (tidak disimpan di metrics)
 
-        baseline_mape = self.calculate_mape(actual_price, baseline_pred_price)
-        # hitung MAPE baseline
+        rmse = self.calculate_rmse(actual_price, ensemble_pred_price)
+        # hitung RMSE model — metrik utama yang ditampilkan ke user (dalam Rp)
+
+        baseline_rmse = self.calculate_rmse(actual_price, baseline_pred_price)
+        # hitung RMSE baseline (dalam Rp)
 
         directional_accuracy = self.calculate_directional_accuracy(actual_return, ensemble_pred_return)
         # hitung akurasi arah model
@@ -469,8 +472,8 @@ class PriceModelTrainer:
         baseline_directional_accuracy = self.calculate_directional_accuracy(actual_return, baseline_pred_return)
         # hitung akurasi arah baseline
 
-        model_beats_baseline = bool(mape < baseline_mape)
-        # cek apakah model lebih bagus dari baseline
+        model_beats_baseline = bool(rmse < baseline_rmse)
+        # cek apakah model lebih bagus dari baseline (berdasarkan RMSE)
 
         self.ensemble_weights = {
             "rf": float(round(split_eval["rf_weight"], 4)),
@@ -482,23 +485,23 @@ class PriceModelTrainer:
         # lakukan evaluasi walk-forward tambahan
 
         self.metrics = {
-            "mape": float(round(mape, 4)),                            # MAPE model
-            "baseline_mape": float(round(baseline_mape, 4)),         # MAPE baseline
+            "rmse": float(round(rmse, 2)),                                # RMSE model (Rp) — metrik utama
+            "baseline_rmse": float(round(baseline_rmse, 2)),             # RMSE baseline (Rp)
             "directional_accuracy": float(round(directional_accuracy, 2)),  # akurasi arah model
             "baseline_directional_accuracy": float(round(baseline_directional_accuracy, 2)),  # akurasi arah baseline
-            "model_beats_baseline": model_beats_baseline,            # model menang baseline atau tidak
-            "train_size": int(len(train_df)),                        # jumlah data train
-            "test_size": int(len(test_df)),                          # jumlah data test
-            "rf_rmse_internal": float(round(split_eval["rf_rmse_internal"], 6)),  # RMSE RF
-            "lr_rmse_internal": float(round(split_eval["lr_rmse_internal"], 6)),  # RMSE LR
+            "model_beats_baseline": model_beats_baseline,                # model menang baseline atau tidak
+            "train_size": int(len(train_df)),                            # jumlah data train
+            "test_size": int(len(test_df)),                              # jumlah data test
+            "rf_rmse_internal": float(round(split_eval["rf_rmse_internal"], 2)),  # RMSE RF (Rp)
+            "lr_rmse_internal": float(round(split_eval["lr_rmse_internal"], 2)),  # RMSE LR (Rp)
             "evaluation_method": "time-series holdout split + walk-forward backtesting",
             # metode evaluasi yang dipakai
 
             "price_metric_basis": "predicted return converted back to price",
             # dasar evaluasi harga: return diprediksi lalu dikonversi ke harga
 
-            "accuracy_metric": "MAPE",
-            # metrik utama yang dipakai
+            "accuracy_metric": "RMSE",
+            # metrik utama yang dipakai (Root Mean Squared Error, satuan Rp)
 
             "baseline_method": "next close equals current close",
             # baseline sederhana: close besok = close hari ini

@@ -317,8 +317,8 @@ def get_stock_prediction(ticker):
             log_prediction(ticker.upper(), False, "Model gagal menghasilkan prediksi.", ip_address=ip_address)
             return jsonify({"success": False, "message": "Prediksi gagal dijalankan."}), 500
 
-        # log sukses + MAPE
-        log_prediction(ticker.upper(), True, mape=result.get("mape"), ip_address=ip_address)
+        # log sukses + RMSE
+        log_prediction(ticker.upper(), True, mape=result.get("rmse"), ip_address=ip_address)
         return jsonify({"success": True, "data": result}), 200
     except Exception as e:  # error internal
         log_external_service("ML Prediction", f"Prediksi gagal untuk {ticker.upper()}", details=str(e), user_id=None, ip_address=ip_address)

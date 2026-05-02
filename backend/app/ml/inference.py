@@ -120,7 +120,6 @@ class StockPredictionService:
             current_price, sector=getattr(self.config, "sector", None)
         )
 
-        # balikin response lengkap (frontend konsumsi ini)
         return {
             "ticker": self.config.ticker,
             "prediction_horizon_days": self.config.forecast_horizon,
@@ -132,7 +131,7 @@ class StockPredictionService:
             "current_price_date": latest_completed_close["date"],  # tgl baseline
             "price_expected_change_pct": float(round(price_change_pct, 2)),
             "price_recommendation": price_recommendation,
-            "mape": float(round(artifact["metrics"]["mape"], 4)),  # akurasi model
+            "rmse": float(round(artifact["metrics"]["rmse"], 2)),  # RMSE model (Rp) — metrik utama
             "fundamental_prediction": fundamental_view,  # hasil scorer fundamental
             "prediction_date": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S"),  # waktu prediksi
             "features_used": {  # metadata fitur — buat transparansi
@@ -153,8 +152,8 @@ class StockPredictionService:
                 "evaluation_method": artifact["metrics"]["evaluation_method"],
                 "price_metric_basis": artifact["metrics"]["price_metric_basis"],
                 "accuracy_metric": artifact["metrics"]["accuracy_metric"],
-                "mape": artifact["metrics"].get("mape"),
-                "baseline_mape": artifact["metrics"].get("baseline_mape"),
+                "rmse": artifact["metrics"].get("rmse"),
+                "baseline_rmse": artifact["metrics"].get("baseline_rmse"),
                 "directional_accuracy": artifact["metrics"].get("directional_accuracy"),
                 "baseline_directional_accuracy": artifact["metrics"].get("baseline_directional_accuracy"),
                 "baseline_method": artifact["metrics"].get("baseline_method"),

@@ -176,31 +176,46 @@ class FundamentalScorer:
             rule_hits.append({"feature": "ROE", "reason": reason, "weight": round(contrib, 3),
                                "z_score": round(z, 2), "sector_median": bm.roe_median})
 
-        if bm.pbv_median is not None and pbv > 0:
-            z = -self._robust_z(pbv, bm.pbv_median, bm.pbv_iqr)
-            contrib = WEIGHT_PBV * (z / 2.0)
-            score += contrib
-            if z > 0:
-                reason = f"PBV di bawah median sektor ({bm.pbv_median:.2f}) — relatif murah"
-            elif z < 0:
-                reason = f"PBV di atas median sektor ({bm.pbv_median:.2f}) — relatif mahal"
+        if bm.pbv_median is not None:
+            if pbv > 0:
+                z = -self._robust_z(pbv, bm.pbv_median, bm.pbv_iqr)
+                contrib = WEIGHT_PBV * (z / 2.0)
+                score += contrib
+                if z > 0:
+                    reason = f"PBV di bawah median sektor ({bm.pbv_median:.2f}) — relatif murah"
+                elif z < 0:
+                    reason = f"PBV di atas median sektor ({bm.pbv_median:.2f}) — relatif mahal"
+                else:
+                    reason = "PBV setara median sektor"
+                rule_hits.append({"feature": "PBV", "reason": reason, "weight": round(contrib, 3),
+                                   "z_score": round(z, 2), "sector_median": bm.pbv_median})
             else:
-                reason = "PBV setara median sektor"
-            rule_hits.append({"feature": "PBV", "reason": reason, "weight": round(contrib, 3),
-                               "z_score": round(z, 2), "sector_median": bm.pbv_median})
+                # pbv=0 artinya data tidak tersedia dari yfinance, tidak dapat skor
+                rule_hits.append({"feature": "PBV", "reason": "Data PBV tidak tersedia (dianggap 0, tidak mendapat skor)",
+                                   "weight": 0.0, "z_score": None, "sector_median": bm.pbv_median})
 
-        if bm.per_median is not None and pe > 0:
-            z = -self._robust_z(pe, bm.per_median, bm.per_iqr)
-            contrib = WEIGHT_PER * (z / 2.0)
-            score += contrib
-            if z > 0:
-                reason = f"PER di bawah median sektor ({bm.per_median:.1f}) — valuasi murah"
-            elif z < 0:
-                reason = f"PER di atas median sektor ({bm.per_median:.1f}) — valuasi mahal"
+        if bm.per_median is not None:
+            if pe > 0:
+                z = -self._robust_z(pe, bm.per_median, bm.per_iqr)
+                contrib = WEIGHT_PER * (z / 2.0)
+                score += contrib
+                if z > 0:
+                    reason = f"PER di bawah median sektor ({bm.per_median:.1f}) — valuasi murah"
+                elif z < 0:
+                    reason = f"PER di atas median sektor ({bm.per_median:.1f}) — valuasi mahal"
+                else:
+                    reason = "PER setara median sektor"
+                rule_hits.append({"feature": "PER", "reason": reason, "weight": round(contrib, 3),
+                                   "z_score": round(z, 2), "sector_median": bm.per_median})
+            elif pe < 0:
+                contrib = -WEIGHT_PER * 0.4
+                score += contrib
+                rule_hits.append({"feature": "PER", "reason": "PER negatif (perusahaan rugi)",
+                                   "weight": round(contrib, 3), "z_score": None, "sector_median": bm.per_median})
             else:
-                reason = "PER setara median sektor"
-            rule_hits.append({"feature": "PER", "reason": reason, "weight": round(contrib, 3),
-                               "z_score": round(z, 2), "sector_median": bm.per_median})
+                # pe=0 artinya data tidak tersedia dari yfinance
+                rule_hits.append({"feature": "PER", "reason": "Data PER tidak tersedia (dianggap 0, tidak mendapat skor)",
+                                   "weight": 0.0, "z_score": None, "sector_median": bm.per_median})
 
         return score, rule_hits
 
@@ -214,6 +229,8 @@ class FundamentalScorer:
         elif eps < 0:
             score -= WEIGHT_EPS * 0.5
             rule_hits.append({"feature": "EPS", "reason": "EPS negatif", "weight": -WEIGHT_EPS * 0.5})
+        else:
+            rule_hits.append({"feature": "EPS", "reason": "Data EPS tidak tersedia atau 0 (tidak mendapat skor)", "weight": 0.0})
 
         if roe >= ROE_HIGH_THRESHOLD:
             score += WEIGHT_ROE * 0.67
@@ -224,6 +241,12 @@ class FundamentalScorer:
         elif roe < 0:
             score -= WEIGHT_ROE * 0.5
             rule_hits.append({"feature": "ROE", "reason": "ROE negatif", "weight": -WEIGHT_ROE * 0.5})
+        elif roe == 0.0:
+            # ROE = 0 bisa berarti data tidak tersedia dari yfinance, bukan benar-benar 0
+            rule_hits.append({"feature": "ROE", "reason": "Data ROE tidak tersedia atau 0 (tidak mendapat skor)", "weight": 0.0})
+        else:
+            # ROE antara 0 dan ROE_MID_THRESHOLD (rendah tapi positif)
+            rule_hits.append({"feature": "ROE", "reason": f"ROE {roe:.1f}% (rendah, di bawah threshold {ROE_MID_THRESHOLD}%)", "weight": 0.0})
 
         if 0 < pbv < PBV_UNDERVALUE:
             score += WEIGHT_PBV * 0.75
@@ -234,6 +257,9 @@ class FundamentalScorer:
         elif pbv > PBV_OVERVALUE:
             score -= WEIGHT_PBV * 0.5
             rule_hits.append({"feature": "PBV", "reason": f"PBV > {PBV_OVERVALUE} (overvalued)", "weight": -WEIGHT_PBV * 0.5})
+        else:
+            # pbv = 0, data tidak tersedia
+            rule_hits.append({"feature": "PBV", "reason": "Data PBV tidak tersedia atau 0 (tidak mendapat skor)", "weight": 0.0})
 
         if 0 < pe <= PER_VALUE_THRESHOLD:
             score += WEIGHT_PER * 0.75
@@ -244,19 +270,36 @@ class FundamentalScorer:
         elif pe > PER_PREMIUM_THRESHOLD:
             score -= WEIGHT_PER * 0.6
             rule_hits.append({"feature": "PER", "reason": f"PER > {PER_PREMIUM_THRESHOLD} (premium)", "weight": -WEIGHT_PER * 0.6})
-        elif pe <= 0:
+        elif pe < 0:
             score -= WEIGHT_PER * 0.4
-            rule_hits.append({"feature": "PER", "reason": "PER negatif (rugi)", "weight": -WEIGHT_PER * 0.4})
+            rule_hits.append({"feature": "PER", "reason": "PER negatif (perusahaan rugi)", "weight": -WEIGHT_PER * 0.4})
+        else:
+            # pe = 0, data tidak tersedia dari yfinance
+            rule_hits.append({"feature": "PER", "reason": "Data PER tidak tersedia atau 0 (tidak mendapat skor)", "weight": 0.0})
 
         return score, rule_hits
 
     def score(self, current_price: float, sector: Optional[str] = None) -> dict:
         fundamentals = self.get_fundamentals()
 
-        eps = self._safe_float(fundamentals.get("eps"))
-        roe = self._safe_float(fundamentals.get("roe"))
-        pbv = self._safe_float(fundamentals.get("pbv"))
-        pe  = self._safe_float(fundamentals.get("pe"))
+        # Ambil nilai mentah (bisa None kalau yfinance tidak punya data)
+        eps_raw = fundamentals.get("eps")
+        roe_raw = fundamentals.get("roe")
+        pbv_raw = fundamentals.get("pbv")
+        pe_raw  = fundamentals.get("pe")
+
+        # Konversi ke float (default 0.0 kalau None, untuk perhitungan skor)
+        eps = self._safe_float(eps_raw)
+        roe = self._safe_float(roe_raw)
+        pbv = self._safe_float(pbv_raw)
+        pe  = self._safe_float(pe_raw)
+
+        # Catat rasio mana yang benar-benar tidak tersedia dari sumber data
+        missing_ratios = []
+        if eps_raw is None: missing_ratios.append("EPS")
+        if roe_raw is None: missing_ratios.append("ROE")
+        if pbv_raw is None: missing_ratios.append("PBV")
+        if pe_raw  is None: missing_ratios.append("PER")
 
         if not sector:
             try:
@@ -308,6 +351,9 @@ class FundamentalScorer:
             "per_median":  round(benchmark.per_median, 2) if benchmark.per_median is not None else None,
         }
 
+        available_count = 4 - len(missing_ratios)
+        data_availability_pct = round((available_count / 4) * 100)
+
         return {
             "estimated_return_pct_3m": float(round(estimated_return_pct, 2)),
             "direction_3m":            direction,
@@ -317,10 +363,20 @@ class FundamentalScorer:
             "scoring_mode":            scoring_mode,
             "rule_hits":               rule_hits,
             "fundamental_inputs": {
-                "eps": float(round(eps, 4)),
-                "roe": float(round(roe, 4)),
-                "pbv": float(round(pbv, 4)),
-                "pe":  float(round(pe,  4)),
+                "eps": float(round(eps, 4)) if eps_raw is not None else None,
+                "roe": float(round(roe, 4)) if roe_raw is not None else None,
+                "pbv": float(round(pbv, 4)) if pbv_raw is not None else None,
+                "pe":  float(round(pe,  4)) if pe_raw  is not None else None,
+            },
+            "data_availability": {
+                "available_count": available_count,
+                "total_count": 4,
+                "availability_pct": data_availability_pct,
+                "missing_ratios": missing_ratios,
+                "note": (
+                    f"Rasio {', '.join(missing_ratios)} tidak tersedia dari sumber data (yfinance). "
+                    "Rasio ini dianggap 0 dalam perhitungan skor sehingga hasilnya mungkin kurang akurat."
+                ) if missing_ratios else "Semua rasio tersedia.",
             },
             "sector_benchmark": benchmark_output,
         }
