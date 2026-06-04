@@ -1,0 +1,100 @@
+﻿{
+  "success": true,
+  "ticker": "BBCA.JK",
+  "artifact_path": "app\\ml\\models\\BBCA_JK_price_model.pkl",
+  "metrics": {
+    "rmse": 146.36,
+    "baseline_rmse": 141.78,
+    "directional_accuracy": 46.85,
+    "baseline_directional_accuracy": 9.79,
+    "model_beats_baseline": false,
+    "train_size": 568,
+    "test_size": 143,
+    "rf_rmse_internal": 143.79,
+    "lr_rmse_internal": 157.78,
+    "evaluation_method": "time-series holdout split + walk-forward backtesting",
+    "price_metric_basis": "predicted return converted back to price",
+    "accuracy_metric": "RMSE",
+    "baseline_method": "next close equals current close",
+    "walk_forward": {
+      "method": "walk-forward expanding window",
+      "windows_evaluated": 6,
+      "window_results": [
+        {
+          "date": "2025-10-15",
+          "train_size": 568,
+          "actual_price": 7300.0,
+          "predicted_price": 7254.375152207391,
+          "baseline_price": 7250.0,
+          "rmse": 45.624847792609216,
+          "baseline_rmse": 50.0,
+          "direction_correct": 1,
+          "baseline_direction_correct": 0
+        },
+        {
+          "date": "2025-11-24",
+          "train_size": 596,
+          "actual_price": 8500.0,
+          "predicted_price": 8470.819009520583,
+          "baseline_price": 8475.0,
+          "rmse": 29.180990479417233,
+          "baseline_rmse": 25.0,
+          "direction_correct": 0,
+          "baseline_direction_correct": 0
+        },
+        {
+          "date": "2026-01-07",
+          "train_size": 624,
+          "actual_price": 8050.0,
+          "predicted_price": 8114.076493354654,
+          "baseline_price": 8150.0,
+          "rmse": 64.0764933546543,
+          "baseline_rmse": 100.0,
+          "direction_correct": 1,
+          "baseline_direction_correct": 0
+        },
+        {
+          "date": "2026-02-20",
+          "train_size": 653,
+          "actual_price": 7299.999999999999,
+          "predicted_price": 7300.0,
+          "baseline_price": 7225.0,
+          "rmse": 9.094947017729282e-13,
+          "baseline_rmse": 74.99999999999909,
+          "direction_correct": 1,
+          "baseline_direction_correct": 0
+        },
+        {
+          "date": "2026-04-09",
+          "train_size": 681,
+          "actual_price": 6700.0,
+          "predicted_price": 6488.6825234968455,
+          "baseline_price": 6475.0,
+          "rmse": 211.31747650315447,
+          "baseline_rmse": 225.0,
+          "direction_correct": 1,
+          "baseline_direction_correct": 0
+        },
+        {
+          "date": "2026-05-25",
+          "train_size": 710,
+          "actual_price": 5975.0,
+          "predicted_price": 6090.125049694684,
+          "baseline_price": 6100.0,
+          "rmse": 115.1250496946841,
+          "baseline_rmse": 125.0,
+          "direction_correct": 1,
+          "baseline_direction_correct": 0
+        }
+      ],
+      "avg_rmse": 77.55,
+      "avg_baseline_rmse": 100.0,
+      "directional_accuracy": 83.33,
+      "baseline_directional_accuracy": 0.0
+    }
+  },
+  "ensemble_weights": {
+    "rf": 0.5232,
+    "lr": 0.4768
+  }
+}

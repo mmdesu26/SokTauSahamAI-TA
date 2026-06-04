@@ -115,7 +115,7 @@ export default function Glossary() {
 
             const definitionIsLong = isLongText(it.definition);
             const hasSourceLink = Boolean(it.sourceUrl);
-            const isVerified = it.status === "verified";
+            const isVerified = it.verificationStatus === "verified";
             const hasVerifiedBy = Boolean(it.verifiedBy);
 
             // tombol "Selengkapnya" cuma muncul kalau memang ada info lanjutan
@@ -131,7 +131,7 @@ export default function Glossary() {
                   <h3 className="text-base font-semibold leading-tight">
                     {it.term}
                   </h3>
-                  <StatusBadge status={it.status} />
+                  <StatusBadge status={it.verificationStatus} />
                 </div>
 
                 {/* definisi — dipotong kalau belum di-expand */}

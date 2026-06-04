@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, g, request  # Flask core: routing, response, context user
 from app.utils.auth_decorators import token_required, role_required  # Decorator untuk autentikasi & role
 from app import db  # Instance database (SQLAlchemy)
-from app.models import Stock, StockProfile, StockFundamental, StockPriceHistory, SystemLog  # Model DB
+from app.models import Stock, StockFundamentalSnapshot, StockProfile, StockFundamental, StockPriceHistory, SystemLog  # Model DB
 from app.utils.yfinance_helper import YFinanceHelper  # Helper untuk ambil data dari Yahoo Finance
 from app.utils.logger import log_stock_crud, log_external_service, SystemLogger  # Logging custom
+from datetime import date
 import logging
 
 # Logger untuk file ini
@@ -132,13 +133,6 @@ def get_all_stocks():
 @token_required
 @role_required("admin")
 def create_stock():
-    """
-    Tambah saham baru ke database
-    Flow:
-    1. Validasi input
-    2. Ambil data dari Yahoo Finance
-    3. Simpan ke DB (Stock, Profile, Fundamental, PriceHistory)
-    """
     try:
         data = request.get_json() or {}
 
@@ -208,6 +202,16 @@ def create_stock():
 
         db.session.add(fundamental)
 
+        snapshot = StockFundamentalSnapshot(
+            stock_id=stock.id,
+            snapshot_date=date.today(),
+            eps_ttm=fundamentals.get("eps"),
+            per_ttm=fundamentals.get("pe"),
+            pbv=fundamentals.get("pbv"),
+            roe=fundamentals.get("roe"),
+        )
+        db.session.add(snapshot)
+
         # Simpan data harga historis
         ohlc_data = _save_daily_ohlc(stock.id, ticker_yf)
         if ohlc_data:
@@ -233,11 +237,6 @@ def create_stock():
                        user_id=_user_id(), error=str(e), ip_address=_ip_address())
 
         return jsonify({"success": False, "message": str(e)}), 500
-
-
-# =========================
-# ROUTE LAIN (ringkas)
-# =========================
 
 # update_stock → update status saham
 # search_stocks → cari saham via Yahoo
@@ -320,24 +319,55 @@ def get_logs():
 def delete_stock(stock_id):
     try:
         stock = Stock.query.get(stock_id)
+
         if not stock:
-            return jsonify({"success": False, "message": "Saham tidak ditemukan"}), 404
+            return jsonify({
+                "success": False,
+                "message": "Saham tidak ditemukan"
+            }), 404
 
         ticker = stock.ticker
+
+        # Hapus semua data anak dulu sebelum hapus data utama stocks
         StockPriceHistory.query.filter_by(stock_id=stock_id).delete()
+        StockFundamentalSnapshot.query.filter_by(stock_id=stock_id).delete()
         StockFundamental.query.filter_by(stock_id=stock_id).delete()
         StockProfile.query.filter_by(stock_id=stock_id).delete()
+
+        # Baru hapus data utama saham
         db.session.delete(stock)
         db.session.commit()
 
-        log_stock_crud("DELETE", stock_id, ticker, user_id=_user_id(), ip_address=_ip_address())
-        return jsonify({"success": True, "message": f"Saham {ticker} berhasil dihapus"}), 200
+        log_stock_crud(
+            "DELETE",
+            stock_id,
+            ticker,
+            user_id=_user_id(),
+            ip_address=_ip_address()
+        )
+
+        return jsonify({
+            "success": True,
+            "message": f"Saham {ticker} berhasil dihapus"
+        }), 200
+
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error deleting stock: {str(e)}")
-        log_stock_crud("DELETE", stock_id, "UNKNOWN", user_id=_user_id(), error=str(e), ip_address=_ip_address())
-        return jsonify({"success": False, "message": str(e)}), 500
 
+        log_stock_crud(
+            "DELETE",
+            stock_id,
+            ticker if 'ticker' in locals() else "UNKNOWN",
+            user_id=_user_id(),
+            error=str(e),
+            ip_address=_ip_address()
+        )
+
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 @admin_bp.route("/sync-stocks", methods=["POST"])
 @token_required

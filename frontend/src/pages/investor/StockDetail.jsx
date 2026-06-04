@@ -736,8 +736,8 @@ export default function StockDetail() {
                   </div>
                 )}
 
-                {/* 4 METRIK UTAMA */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {/* 3 METRIK UTAMA */}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <MetricCard
                     label="Estimasi Return"
                     value={`${fundamentalReturn3M >= 0 ? "+" : ""}${fundamentalReturn3M.toFixed(2)}%`}
@@ -755,10 +755,6 @@ export default function StockDetail() {
                         {recommendation}
                       </span>
                     }
-                  />
-                  <MetricCard
-                    label="Perkiraan Harga"
-                    value={fundamentalImpliedPrice ? fmtIDR(fundamentalImpliedPrice) : "—"}
                   />
                 </div>
 
