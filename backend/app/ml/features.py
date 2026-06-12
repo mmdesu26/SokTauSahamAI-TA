@@ -26,7 +26,6 @@ class PriceFeatureBuilder:
             feature_cols.append(f"lag_volume_{i}")
 
         feature_cols.extend(["daily_range", "open_close_change", "volume_change"])
-
         return feature_cols
 
     @staticmethod
@@ -77,16 +76,7 @@ class PriceFeatureBuilder:
 
         return hist_df
 
-    def prepare_price_dataset(self):
-        hist_df = self.get_source_history()
-        if hist_df is None or hist_df.empty:
-            return None, None
-
-        latest_completed_close = {
-            "date": hist_df.index[-1].strftime("%Y-%m-%d"),
-            "close": float(hist_df.iloc[-1]["Close"]),
-        }
-
+    def _build_feature_frame(self, hist_df):
         df = hist_df[["Open", "High", "Low", "Close", "Volume"]].copy()
         df.columns = ["open", "high", "low", "close", "volume"]
 
@@ -118,11 +108,59 @@ class PriceFeatureBuilder:
             df["close"].shift(-self.config.forecast_horizon) - df["close"]
         ) / df["close"]
 
-        df = df.replace([np.inf, -np.inf], np.nan).dropna().copy()
+        df = df.replace([np.inf, -np.inf], np.nan)
+        return df
+
+    def prepare_price_dataset(self):
+        """
+        Dipakai untuk TRAINING.
+        Baris yang target_return_future-nya kosong harus dibuang.
+        """
+        hist_df = self.get_source_history()
+        if hist_df is None or hist_df.empty:
+            return None, None
+
+        latest_completed_close = {
+            "date": hist_df.index[-1].strftime("%Y-%m-%d"),
+            "close": float(hist_df.iloc[-1]["Close"]),
+        }
+
+        df = self._build_feature_frame(hist_df)
+
+        required_cols = self.build_feature_columns() + ["target_return_future"]
+        df = df.dropna(subset=required_cols).copy()
 
         if len(df) < 120:
             logger.error(
                 "Dataset harga terlalu sedikit setelah preprocessing untuk %s",
+                self.config.ticker,
+            )
+            return None, latest_completed_close
+
+        return df, latest_completed_close
+
+    def prepare_prediction_dataset(self):
+        """
+        Dipakai untuk PREDIKSI.
+        Baris terakhir tidak boleh dibuang hanya karena target_return_future kosong.
+        """
+        hist_df = self.get_source_history()
+        if hist_df is None or hist_df.empty:
+            return None, None
+
+        latest_completed_close = {
+            "date": hist_df.index[-1].strftime("%Y-%m-%d"),
+            "close": float(hist_df.iloc[-1]["Close"]),
+        }
+
+        df = self._build_feature_frame(hist_df)
+
+        required_cols = self.build_feature_columns()
+        df = df.dropna(subset=required_cols).copy()
+
+        if df.empty:
+            logger.error(
+                "Dataset prediksi kosong setelah preprocessing untuk %s",
                 self.config.ticker,
             )
             return None, latest_completed_close
