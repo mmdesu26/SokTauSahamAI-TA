@@ -679,7 +679,7 @@ export default function StockDetail() {
 
                 {/* Kartu akurasi */}
                 <Card className="p-5">
-                  <h3 className="mb-4 text-base font-semibold text-foreground">Akurasi Model</h3>
+                  <h3 className="mb-4 text-base font-semibold text-foreground">Performa Model</h3>
                   <div className="divide-y divide-border/60">
                     <PredRow
                       label="RMSE"

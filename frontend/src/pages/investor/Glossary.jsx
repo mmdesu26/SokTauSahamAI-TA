@@ -145,15 +145,7 @@ export default function Glossary() {
 
                 {/* footer card */}
                 <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
-                  {it.verifiedBy ? (
-                    <span className="truncate text-xs text-muted-foreground">
-                      Sumber:{" "}
-                      <span className="text-foreground">{it.verifiedBy}</span>
-                    </span>
-                  ) : (
-                    <span />
-                  )}
-
+                  
                   {shouldShowExpandButton && (
                     <button
                       onClick={() => setExpanded(open ? null : it.id)}
@@ -172,13 +164,15 @@ export default function Glossary() {
                 {open && (
                   <div className="mt-3 space-y-2">
                     {it.verifiedBy && (
-                      <p className="text-xs text-muted-foreground">
-                        Diverifikasi / sumber oleh:{" "}
-                        <span className="font-medium text-foreground">
-                          {it.verifiedBy}
-                        </span>
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {it.verificationStatus === "verified"
+                        ? "Diverifikasi/Sumber oleh: "
+                        : "Sumber: "}
+                      <span className="font-medium text-foreground">
+                        {it.verifiedBy}
+                      </span>
+                    </p>
+                  )}
 
                     {it.sourceUrl && (
                       <a
