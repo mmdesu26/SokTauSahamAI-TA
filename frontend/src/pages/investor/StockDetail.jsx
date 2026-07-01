@@ -692,10 +692,7 @@ export default function StockDetail() {
                   <div className="mt-4">
                     <Accordion title="Cara membaca RMSE" icon="📖">
                       <p className="text-xs leading-relaxed text-justify text-muted-foreground">
-                        RMSE (Root Mean Squared Error) menunjukkan seberapa jauh rata-rata prediksi
-                        harga model dari harga aktual, dalam satuan Rupiah.
-                        Makin kecil nilai RMSE, makin dekat prediksi model terhadap data historis.
-                        Contoh: RMSE Rp 150 artinya rata-rata selisih prediksi dan aktual sekitar Rp 150 per saham.
+                        RMSE (Root Mean Squared Error) merupakan metrik evaluasi yang digunakan untuk mengukur rata-rata besarnya kesalahan prediksi harga saham terhadap harga saham aktual pada data pengujian. Nilai RMSE dinyatakan dalam satuan Rupiah. Semakin kecil nilai RMSE, semakin baik performa model karena hasil prediksi semakin mendekati nilai aktual. Sebagai contoh, RMSE sebesar Rp180 menunjukkan bahwa rata-rata kesalahan prediksi model terhadap harga saham aktual adalah sekitar Rp180 per lembar saham.
                       </p>
                     </Accordion>
                   </div>

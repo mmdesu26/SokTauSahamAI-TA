@@ -36,28 +36,25 @@ class User(db.Model):
 class Glossary(db.Model):
     __tablename__ = "glossaries"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
 
-    term = db.Column(db.String(25), nullable=False, unique=True)
+    term = db.Column(db.String(25), unique=True, nullable=False)
 
     definition = db.Column(db.Text, nullable=False)
 
     source_url = db.Column(db.Text, nullable=True)
 
-    verification_status = db.Column(
-        db.String(30),
+    created_at = db.Column(
+        db.DateTime,
         nullable=False,
-        default="literature_based"
+        server_default=db.func.current_timestamp()
     )
-
-    verified_by = db.Column(db.String(35), nullable=True)
-
-    created_at = db.Column(db.DateTime, default=db.func.now())
 
     updated_at = db.Column(
         db.DateTime,
-        default=db.func.now(),
-        onupdate=db.func.now()
+        nullable=False,
+        server_default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp()
     )
 
     def to_dict(self):
@@ -66,8 +63,8 @@ class Glossary(db.Model):
             "term": self.term,
             "definition": self.definition,
             "sourceUrl": self.source_url,
-            "verificationStatus": self.verification_status,
-            "verifiedBy": self.verified_by,
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
 
     def __repr__(self):
@@ -152,7 +149,7 @@ class StockProfile(db.Model):
     sector = db.Column(db.String(30), nullable=True)
     industry = db.Column(db.String(30), nullable=True)
     long_business_summary = db.Column(db.Text, nullable=True)
-    website = db.Column(db.String(60), nullable=True)
+    website = db.Column(db.String(150), nullable=True)
     city = db.Column(db.String(15), nullable=True)
     country = db.Column(db.String(15), nullable=True)
 
@@ -187,10 +184,15 @@ class StockFundamental(db.Model):
     __tablename__ = "stock_fundamentals"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+
     stock_id = db.Column(
-        db.Integer, db.ForeignKey("stocks.id"), nullable=False, unique=True
+        db.Integer,
+        db.ForeignKey("stocks.id"),
+        nullable=False,
+        unique=True
     )
 
+    # Fundamental perusahaan
     eps_ttm = db.Column(db.Float, nullable=True)
     per_ttm = db.Column(db.Float, nullable=True)
     pbv = db.Column(db.Float, nullable=True)
@@ -201,31 +203,58 @@ class StockFundamental(db.Model):
     total_assets = db.Column(db.BigInteger, nullable=True)
     total_equity = db.Column(db.BigInteger, nullable=True)
 
+    # Benchmark sektor
+    benchmark_per = db.Column(db.Float, nullable=True)
+    benchmark_pbv = db.Column(db.Float, nullable=True)
+    benchmark_roe = db.Column(db.Float, nullable=True)
+    benchmark_eps = db.Column(db.Float, nullable=True)
+
     created_at = db.Column(
-        db.DateTime, nullable=False, server_default=db.func.current_timestamp()
+        db.DateTime,
+        nullable=False,
+        server_default=db.func.current_timestamp()
     )
+
     updated_at = db.Column(
         db.DateTime,
         nullable=False,
         server_default=db.func.current_timestamp(),
-        onupdate=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp()
     )
 
-    stock = db.relationship("Stock", backref=db.backref("fundamental", uselist=False))
+    stock = db.relationship(
+        "Stock",
+        backref=db.backref("fundamental", uselist=False)
+    )
 
     def to_dict(self):
         return {
             "id": self.id,
             "stock_id": self.stock_id,
+
+            # Fundamental perusahaan
             "epsTTM": self.eps_ttm,
             "perTTM": self.per_ttm,
             "pbv": self.pbv,
             "roe": self.roe,
+
             "revenue": self.revenue,
             "netIncome": self.net_income,
             "totalAssets": self.total_assets,
             "totalEquity": self.total_equity,
+
+            # Benchmark sektor
+            "benchmarkPER": self.benchmark_per,
+            "benchmarkPBV": self.benchmark_pbv,
+            "benchmarkROE": self.benchmark_roe,
+            "benchmarkEPS": self.benchmark_eps,
+
+            "createdAt": self.created_at.isoformat() if self.created_at else None,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+    def __repr__(self):
+        return f"<StockFundamental stock_id={self.stock_id}>"
 
 
 class StockPriceHistory(db.Model):

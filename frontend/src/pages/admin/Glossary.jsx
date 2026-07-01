@@ -9,8 +9,6 @@ import {
   Save,
   Info,
   AlertCircle,
-  BadgeCheck,
-  Library,
   ExternalLink,
 } from "lucide-react";
 
@@ -21,23 +19,22 @@ const INITIAL_FORM = {
   term: "",
   definition: "",
   source_url: "",
-  verification_status: "literature_based",
-  verified_by: "",
 };
-
-const STATUS_OPTIONS = [
-  { value: "literature_based", label: "Berbasis Literatur Resmi" },
-  { value: "verified", label: "Terverifikasi" },
-];
 
 function truncateUrl(url, maxLength = 45) {
   if (!url) return "-";
+
   try {
     const { hostname, pathname } = new URL(url);
     const short = `${hostname}${pathname}`;
-    return short.length > maxLength ? short.slice(0, maxLength) + "…" : short;
+
+    return short.length > maxLength
+      ? short.slice(0, maxLength) + "…"
+      : short;
   } catch {
-    return url.length > maxLength ? url.slice(0, maxLength) + "…" : url;
+    return url.length > maxLength
+      ? url.slice(0, maxLength) + "…"
+      : url;
   }
 }
 
@@ -46,7 +43,6 @@ export default function AdminGlossary() {
 
   const [items, setItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -60,19 +56,13 @@ export default function AdminGlossary() {
   const filteredItems = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
-    return items.filter((item) => {
-      const matchSearch =
+    return items.filter(
+      (item) =>
         !q ||
         item.term?.toLowerCase().includes(q) ||
-        item.definition?.toLowerCase().includes(q) ||
-        item.verifiedBy?.toLowerCase().includes(q);
-
-      const matchStatus =
-        !statusFilter || item.verificationStatus === statusFilter;
-
-      return matchSearch && matchStatus;
-    });
-  }, [items, searchQuery, statusFilter]);
+        item.definition?.toLowerCase().includes(q)
+    );
+  }, [items, searchQuery]);
 
   const fetchGlossary = async () => {
     setIsLoading(true);
@@ -111,9 +101,8 @@ export default function AdminGlossary() {
       term: item.term || "",
       definition: item.definition || "",
       source_url: item.sourceUrl || "",
-      verification_status: item.verificationStatus || "literature_based",
-      verified_by: item.verifiedBy || "",
     });
+
     setEditingId(item.id);
     setIsModalOpen(true);
   };
@@ -136,15 +125,10 @@ export default function AdminGlossary() {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setFormData((prev) => {
-      const next = { ...prev, [name]: value };
-
-      if (name === "verification_status" && value !== "verified") {
-        next.verified_by = "";
-      }
-
-      return next;
-    });
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -154,26 +138,10 @@ export default function AdminGlossary() {
       term: formData.term.trim(),
       definition: formData.definition.trim(),
       source_url: formData.source_url.trim(),
-      verification_status: formData.verification_status.trim(),
-      verified_by:
-        formData.verification_status === "verified"
-          ? formData.verified_by.trim()
-          : "",
     };
 
     if (!payload.term || !payload.definition) {
       showError("Istilah dan definisi wajib diisi.", "Validasi Gagal");
-      return;
-    }
-
-    if (
-      payload.verification_status === "verified" &&
-      !payload.verified_by
-    ) {
-      showError(
-        "Nama verifier wajib diisi jika status terverifikasi.",
-        "Validasi Gagal"
-      );
       return;
     }
 
@@ -199,6 +167,7 @@ export default function AdminGlossary() {
           data.message || "Data glosarium berhasil disimpan.",
           "Berhasil"
         );
+
         closeModal();
         fetchGlossary();
       } else {
@@ -215,7 +184,9 @@ export default function AdminGlossary() {
     try {
       const { ok, data } = await apiFetch(
         `/admin/glossary/${selectedItem.id}`,
-        { method: "DELETE" }
+        {
+          method: "DELETE",
+        }
       );
 
       if (ok && data.success) {
@@ -223,6 +194,7 @@ export default function AdminGlossary() {
           data.message || "Data glosarium berhasil dihapus.",
           "Berhasil"
         );
+
         fetchGlossary();
       } else {
         showError(data?.message || "Gagal menghapus data glosarium.", "Gagal");
@@ -234,98 +206,75 @@ export default function AdminGlossary() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    if (status === "verified") {
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-          <BadgeCheck className="h-3.5 w-3.5" />
-          Terverifikasi
-        </span>
-      );
-    }
-
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
-        <Library className="h-3.5 w-3.5" />
-        Literatur Resmi
-      </span>
-    );
-  };
-
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
-      {/* Header */}
+
       <section className="rounded-3xl border border-border bg-card p-8 shadow-sm md:p-12">
         <h1 className="mb-3 text-4xl font-bold tracking-tight text-foreground md:text-5xl">
           Manajemen Data Glosarium
         </h1>
+
         <p className="max-w-4xl text-lg text-muted-foreground">
-          Kelola istilah saham, link sumber, dan status verifikasi glosarium.
+          Kelola istilah saham, definisi, dan link sumber glosarium.
         </p>
       </section>
 
-      {/* Toolbar: Search + Filter + Tambah */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="grid flex-1 gap-3 md:grid-cols-2">
-          {/* Search */}
+
+        <div className="flex-1">
           <div className="relative">
+
             <Search className="pointer-events-none absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Cari istilah atau definisi..."
-              className="w-full rounded-xl border border-input bg-background py-3 pr-4 pl-12 text-foreground placeholder:text-muted-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
+              className="w-full rounded-xl border border-input bg-background py-3 pr-4 pl-12"
             />
-          </div>
 
-          {/* Filter Status */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-          >
-            <option value="">Semua Status</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white shadow-sm transition hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-admin)] px-5 py-3 font-medium text-white"
         >
           <Plus size={18} />
           Tambah Istilah
         </button>
+
       </div>
 
-      {/* Tabel Daftar Istilah */}
       <section className="rounded-3xl border border-border bg-card shadow-sm">
-        {/* Header section */}
+
         <div className="flex flex-col gap-3 border-b border-border px-7 py-5 md:flex-row md:items-center md:justify-between">
+
           <div className="flex items-center gap-3">
+
             <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
               <Info className="h-5 w-5 text-[var(--color-admin)]" />
             </div>
+
             <div>
-              <h2 className="text-xl font-bold text-foreground">
+              <h2 className="text-xl font-bold">
                 Daftar Istilah Glosarium
               </h2>
+
               <p className="text-sm text-muted-foreground">
-                Edit link sumber, ubah status, atau hapus istilah.
+                Edit definisi, ubah link sumber, atau hapus istilah.
               </p>
             </div>
+
           </div>
 
-          <div className="inline-flex w-fit items-center gap-2 rounded-full bg-[var(--color-admin)] px-5 py-2 text-sm font-semibold text-white shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-full bg-[var(--color-admin)] px-5 py-2 text-sm font-semibold text-white">
             <BookOpen className="h-4 w-4" />
             Total: {items.length} istilah
           </div>
+
         </div>
 
         {/* Konten tabel */}
@@ -338,10 +287,9 @@ export default function AdminGlossary() {
             <table className="w-full min-w-[700px]">
               <thead>
                 <tr className="border-b border-border bg-muted text-left text-sm font-semibold text-muted-foreground">
-                  <th className="w-[22%] px-6 py-4">Istilah</th>
-                  <th className="w-[35%] px-6 py-4">Definisi</th>
-                  <th className="w-[18%] px-6 py-4">Status</th>
-                  <th className="w-[15%] px-6 py-4">Sumber</th>
+                  <th className="w-[25%] px-6 py-4">Istilah</th>
+                  <th className="w-[45%] px-6 py-4">Definisi</th>
+                  <th className="w-[20%] px-6 py-4">Sumber</th>
                   <th className="w-[10%] px-6 py-4 text-center">Aksi</th>
                 </tr>
               </thead>
@@ -357,11 +305,6 @@ export default function AdminGlossary() {
                       <p className="font-semibold text-foreground">
                         {item.term}
                       </p>
-                      {item.verifiedBy && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          oleh {item.verifiedBy}
-                        </p>
-                      )}
                     </td>
 
                     {/* Definisi */}
@@ -369,11 +312,6 @@ export default function AdminGlossary() {
                       <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                         {item.definition}
                       </p>
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      {getStatusBadge(item.verificationStatus)}
                     </td>
 
                     {/* Sumber */}
@@ -387,12 +325,14 @@ export default function AdminGlossary() {
                           className="inline-flex items-center gap-1 text-sm text-[var(--color-admin)] underline underline-offset-4 transition hover:opacity-75"
                         >
                           <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                          <span className="max-w-[120px] truncate">
+                          <span className="max-w-[140px] truncate">
                             {truncateUrl(item.sourceUrl)}
                           </span>
                         </a>
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-sm text-muted-foreground">
+                          —
+                        </span>
                       )}
                     </td>
 
@@ -428,8 +368,9 @@ export default function AdminGlossary() {
             <p className="text-xl font-semibold text-foreground">
               Data tidak ditemukan
             </p>
+
             <p className="mt-2 text-muted-foreground">
-              Tidak ada istilah yang cocok dengan filter yang dipilih.
+              Tidak ada istilah yang cocok dengan pencarian.
             </p>
           </div>
         )}
@@ -439,18 +380,22 @@ export default function AdminGlossary() {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-border bg-card p-7 shadow-2xl">
-            {/* Modal Header */}
+
+            {/* Header */}
             <div className="mb-6 flex items-start justify-between gap-4">
+
               <div className="flex items-start gap-3">
                 <div className="rounded-xl bg-[var(--color-admin)]/15 p-3">
                   <BookOpen className="h-5 w-5 text-[var(--color-admin)]" />
                 </div>
+
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">
                     {editingId ? "Edit Istilah" : "Tambah Istilah Baru"}
                   </h2>
+
                   <p className="text-sm text-muted-foreground">
-                    Isi istilah, definisi, link sumber, dan status verifikasi.
+                    Isi istilah, definisi, dan link sumber.
                   </p>
                 </div>
               </div>
@@ -462,21 +407,24 @@ export default function AdminGlossary() {
               >
                 <X size={20} />
               </button>
+
             </div>
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
+
               {/* Istilah */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">
                   Istilah <span className="text-red-500">*</span>
                 </label>
+
                 <input
                   type="text"
                   name="term"
                   value={formData.term}
                   onChange={handleChange}
-                  placeholder="Contoh: PER"
+                  placeholder="Contoh: Price to Earnings Ratio (PER)"
                   className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                 />
               </div>
@@ -486,11 +434,12 @@ export default function AdminGlossary() {
                 <label className="mb-2 block text-sm font-medium text-foreground">
                   Definisi <span className="text-red-500">*</span>
                 </label>
+
                 <textarea
                   name="definition"
                   value={formData.definition}
                   onChange={handleChange}
-                  rows={5}
+                  rows={6}
                   placeholder="Masukkan definisi istilah..."
                   className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                 />
@@ -501,55 +450,25 @@ export default function AdminGlossary() {
                 <label className="mb-2 block text-sm font-medium text-foreground">
                   Link Sumber
                 </label>
+
                 <input
-                  type="text"
+                  type="url"
                   name="source_url"
                   value={formData.source_url}
                   onChange={handleChange}
                   placeholder="https://..."
                   className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
                 />
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Masukkan tautan referensi resmi seperti BEI, OJK, IDX, atau sumber
+                  literatur terpercaya lainnya.
+                </p>
               </div>
 
-              {/* Status + Verified By dalam satu baris */}
-              <div className="grid gap-5 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">
-                    Status Verifikasi
-                  </label>
-                  <select
-                    name="verification_status"
-                    value={formData.verification_status}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {formData.verification_status === "verified" && (
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-foreground">
-                      Terverifikasi oleh <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="verified_by"
-                      value={formData.verified_by}
-                      onChange={handleChange}
-                      placeholder="Contoh: Dr. Nama Dosen"
-                      className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Tombol Aksi */}
+              {/* Tombol */}
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+
                 <button
                   type="button"
                   onClick={closeModal}
@@ -566,8 +485,11 @@ export default function AdminGlossary() {
                   <Save size={18} />
                   {editingId ? "Simpan Perubahan" : "Tambah Istilah"}
                 </button>
+
               </div>
+
             </form>
+
           </div>
         </div>
       )}

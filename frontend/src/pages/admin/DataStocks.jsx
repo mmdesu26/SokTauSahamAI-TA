@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Loader2,
   Plus,
   Edit2,
   Trash2,
@@ -26,7 +27,7 @@ export default function AdminDataStocks() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedStockName, setSelectedStockName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState(INITIAL_FORM);
 
   const filtered = useMemo(() => {
@@ -120,50 +121,53 @@ export default function AdminDataStocks() {
   };
 
   const handleSave = async () => {
-    if (!formData.ticker.trim()) {
-      showError("Format: BBCA atau BBCA.JK (Ticker saham)", "Gagal");
-      return;
-    }
+  if (!formData.ticker.trim()) {
+    showError("Format: BBCA atau BBCA.JK (Ticker saham)", "Gagal");
+    return;
+  }
 
-    const payload = {
-      ticker: formData.ticker.trim().toUpperCase(),
-      status: formData.status || "Active",
-    };
-
-    try {
-      let response;
-
-      if (modalType === "edit" && selectedStockId) {
-        // Edit hanya bisa ubah status saja
-        response = await apiFetch(`/admin/stocks/${selectedStockId}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
-      } else {
-        // Create: Fetch nama, sektor, harga otomatis dari yfinance
-        response = await apiFetch("/admin/stocks", {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      }
-
-      const { ok, data } = response;
-
-      if (ok && data?.success) {
-        showSuccess(
-          data.message ||
-            "Data saham berhasil disimpan. Informasi lain diambil dari yfinance.",
-          "Berhasil"
-        );
-        handleCloseModal();
-        fetchStocks();
-      } else {
-        showError(data?.message || "Gagal menyimpan data saham.", "Gagal");
-      }
-    } catch {
-      showError("Terjadi kesalahan saat menyimpan data saham.", "Gagal");
-    }
+  const payload = {
+    ticker: formData.ticker.trim().toUpperCase(),
+    status: formData.status || "Active",
   };
+
+  setIsSaving(true);
+
+  try {
+    let response;
+
+    if (modalType === "edit" && selectedStockId) {
+      response = await apiFetch(`/admin/stocks/${selectedStockId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      response = await apiFetch("/admin/stocks", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    }
+
+    const { ok, data } = response;
+
+    if (ok && data?.success) {
+      showSuccess(
+        data.message ||
+          "Data saham berhasil disimpan.",
+        "Berhasil"
+      );
+
+      handleCloseModal();
+      fetchStocks();
+    } else {
+      showError(data?.message || "Gagal menyimpan data saham.", "Gagal");
+    }
+  } catch {
+    showError("Terjadi kesalahan saat menyimpan data saham.", "Gagal");
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 pb-16">
@@ -343,7 +347,7 @@ export default function AdminDataStocks() {
                     }))
                   }
                   placeholder="Contoh: BBCA"
-                  disabled={modalType === "edit"}
+                  disabled={modalType === "edit" || isSaving}
                   className="w-full rounded-xl border border-input bg-background px-4 py-3 text-foreground transition focus:border-[var(--color-admin)] focus:outline-none focus:ring-2 focus:ring-[var(--color-admin)]/20 disabled:cursor-not-allowed disabled:bg-muted"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -355,6 +359,7 @@ export default function AdminDataStocks() {
 
               <select
                 value={formData.status}
+                disabled={isSaving}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
@@ -371,16 +376,25 @@ export default function AdminDataStocks() {
             <div className="mt-6 flex gap-3">
               <button
                 onClick={handleCloseModal}
-                className="flex-1 rounded-xl border border-border bg-background py-3 text-foreground transition hover:bg-muted"
+                disabled={isSaving}
+                className="flex-1 rounded-xl border border-border bg-background py-3 text-foreground transition hover:bg-muted disabled:opacity-60"
               >
                 Batal
               </button>
 
               <button
                 onClick={handleSave}
-                className="flex-1 rounded-xl bg-[var(--color-admin)] py-3 text-white transition hover:opacity-90"
+                disabled={isSaving}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-admin)] py-3 text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Simpan
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  "Simpan"
+                )}
               </button>
             </div>
           </div>

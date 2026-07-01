@@ -4,11 +4,6 @@ import json
 # Import os untuk manipulasi path file
 import os
 
-# Import inspect dan text dari SQLAlchemy
-# - inspect: untuk mengecek struktur tabel database
-# - text: untuk menjalankan raw SQL
-from sqlalchemy import inspect, text
-
 # Import factory app, database, dan bcrypt dari app
 from app import create_app, db, bcrypt
 
@@ -20,66 +15,6 @@ from app.utils.logger import cleanup_old_logs
 
 # Membuat instance Flask app dari factory
 app = create_app()
-
-
-def ensure_glossary_schema():
-    """
-    Mengecek apakah tabel glossaries sudah memiliki kolom yang dibutuhkan.
-    Jika ada kolom yang belum ada, tambahkan secara manual memakai ALTER TABLE.
-
-    Tujuan:
-    - menjaga kompatibilitas schema lama
-    - semacam migrasi ringan tanpa Alembic
-    """
-    # Membaca metadata schema database
-    inspector = inspect(db.engine)
-
-    # Jika tabel glossaries belum ada, tidak perlu lanjut
-    if "glossaries" not in inspector.get_table_names():
-        return
-
-    # Ambil semua nama kolom yang sudah ada di tabel glossaries
-    existing_columns = {col["name"] for col in inspector.get_columns("glossaries")}
-
-    # List SQL ALTER TABLE yang perlu dijalankan
-    alter_statements = []
-
-    # Jika kolom source_url belum ada, tambahkan
-    if "source_url" not in existing_columns:
-        alter_statements.append(
-            "ALTER TABLE glossaries ADD COLUMN source_url TEXT NULL"
-        )
-
-    # Jika kolom verification_status belum ada, tambahkan
-    if "verification_status" not in existing_columns:
-        alter_statements.append(
-            "ALTER TABLE glossaries ADD COLUMN verification_status VARCHAR(30) NOT NULL DEFAULT 'literature_based'"
-        )
-
-    # Jika kolom verified_by belum ada, tambahkan
-    if "verified_by" not in existing_columns:
-        alter_statements.append(
-            "ALTER TABLE glossaries ADD COLUMN verified_by VARCHAR(150) NULL"
-        )
-
-    # Jalankan perubahan schema dalam transaction
-    with db.engine.begin() as connection:
-        # Eksekusi semua ALTER TABLE yang diperlukan
-        for sql in alter_statements:
-            connection.execute(text(sql))
-
-        # Pastikan verification_status yang kosong/null diisi default
-        connection.execute(
-            text(
-                """
-                UPDATE glossaries
-                SET
-                    verification_status = COALESCE(NULLIF(verification_status, ''), 'literature_based')
-                """
-            )
-        )
-
-    print("Schema glossary sudah dicek/diperbarui.")
 
 
 def load_glossary_seed():
@@ -181,10 +116,6 @@ def seed_glossary_from_json():
             term=term,
             definition=definition,
             source_url=(item.get("source_url") or "").strip() or None,
-            verification_status=(
-                item.get("verification_status") or "literature_based"
-            ).strip(),
-            verified_by=(item.get("verified_by") or "").strip() or None,
         )
 
         # Tambahkan ke session
@@ -216,9 +147,6 @@ def bootstrap():
         print(
             "Tabel dicek/dibuat: users, glossaries, stocks, stock_profiles, stock_fundamentals, stock_price_histories"
         )
-
-        # Pastikan schema glossary lengkap
-        ensure_glossary_schema()
 
         # Hapus log lama (> 6 bulan)
         deleted = cleanup_old_logs()
