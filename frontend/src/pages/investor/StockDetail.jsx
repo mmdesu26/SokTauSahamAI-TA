@@ -1,10 +1,3 @@
-// ============================================================
-// StockDetail.jsx — halaman detail saham (profil + prediksi + fundamental)
-// UI POLISH: tab Prediksi & Fundamental dirapi — teks konsisten justify,
-//            spacing lebih breathable, hierarki visual lebih jelas
-// Bagian penjelasan panjang dibungkus Accordion toggle
-// ============================================================
-
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -18,6 +11,7 @@ import {
   Sparkles,
   CalendarRange,
   ChevronDown,
+  Check,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -27,6 +21,7 @@ import Spinner from "@/components/ui/Spinner";
 import StockLogo from "@/components/ui/StockLogo";
 import StockCandleChart from "@/components/StockCandleChart";
 import { cn } from "@/lib/utils";
+import { BookIcon, ChartIcon, MicroscopeIcon, ClipboardIcon, LightbulbIcon, BrainIcon, LinkIcon } from "@/components/icons";
 
 // ============================================================
 // BAGIAN 0: KOMPONEN ACCORDION
@@ -89,12 +84,12 @@ const RAW_DATA_LABELS = {
 const RAW_DATA_CONTEXT = {
   currentPrice:      "Harga pasar saham saat ini. Dipakai sebagai pembagi dalam PER dan PBV.",
   bookValuePerShare: "Nilai aset bersih per lembar saham. Dasar perhitungan PBV.",
-  revenue:           "Total pendapatan sebelum dikurangi biaya. Bukan laba hanya ukuran skala bisnis.",
+  revenue:           "Total pendapatan sebelum dikurangi biaya. Bukan laba — hanya ukuran skala bisnis.",
   netIncome:         "Laba bersih setelah semua biaya. Inilah yang dibagi jadi EPS dan ROE.",
-  totalAssets:       "Seluruh aset yang dimiliki perusahaan kas, piutang, properti, dll.",
+  totalAssets:       "Seluruh aset yang dimiliki perusahaan — kas, piutang, properti, dll.",
   totalEquity:       "Modal sendiri (aset dikurangi utang). Dasar perhitungan ROE dan PBV.",
   marketCap:         "Total nilai pasar perusahaan = harga saham × jumlah saham beredar.",
-  price_to_book:     "Sama dengan PBV harga saham dibanding nilai buku per saham.",
+  price_to_book:     "Sama dengan PBV — harga saham dibanding nilai buku per saham.",
   trailing_pe:       "PER berbasis laba 12 bulan terakhir (trailing twelve months).",
 };
 
@@ -350,7 +345,7 @@ export default function StockDetail() {
     if (mode === "relative_sector" && bm?.sector) {
       parts.push(`Skor dihitung relatif terhadap median ${bm.sample_size} saham di sektor "${bm.sector}".`);
     } else if (mode === "absolute_fallback") {
-      parts.push("Data benchmark sektor belum cukup skor dihitung menggunakan threshold standar.");
+      parts.push("Data benchmark sektor belum cukup — skor dihitung menggunakan threshold standar.");
     }
     if (fundamentalDataAvailability) {
       const { available_count, total_count, missing_ratios: mr } = fundamentalDataAvailability;
@@ -459,7 +454,7 @@ export default function StockDetail() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{ticker}</h1>
-                <Badge variant="outline">{profile.sector || "—"}</Badge>
+                <Badge variant="outline">{profile.sector || "-"}</Badge>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{profile.shortName || profile.longName || "-"}</p>
               <p className="mt-1 text-xs text-muted-foreground">{profile.industry || "-"}</p>
@@ -688,9 +683,10 @@ export default function StockDetail() {
                     <PredRow label="Waktu Prediksi" value={prediction?.prediction_date || "-"} />
                   </div>
 
-                  {/* Cara membaca RMSE → accordion */}
+                  {/* Cara membaca RMSE — accordion */}
                   <div className="mt-4">
-                    <Accordion title="Cara membaca RMSE" icon="📖">
+                    <Accordion title="Cara membaca RMSE" 
+                    icon={<BookIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />}>
                       <p className="text-xs leading-relaxed text-justify text-muted-foreground">
                         RMSE (Root Mean Squared Error) merupakan metrik evaluasi yang digunakan untuk mengukur rata-rata besarnya kesalahan prediksi harga saham terhadap harga saham aktual pada data pengujian. Nilai RMSE dinyatakan dalam satuan Rupiah. Semakin kecil nilai RMSE, semakin baik performa model karena hasil prediksi semakin mendekati nilai aktual. Sebagai contoh, RMSE sebesar Rp180 menunjukkan bahwa rata-rata kesalahan prediksi model terhadap harga saham aktual adalah sekitar Rp180 per lembar saham.
                       </p>
@@ -708,9 +704,21 @@ export default function StockDetail() {
                   </h3>
                   {fundamentalScoringMode && (
                     <span className="inline-flex shrink-0 items-center rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-                      {fundamentalScoringMode === "relative_sector"
-                        ? `📊 Relatif vs Sektor (n=${fundamentalSectorBenchmark?.sample_size ?? "?"})`
-                        : "📋 Threshold Standar"}
+                     {
+                        fundamentalScoringMode === "relative_sector" ? (
+                          <div className="flex items-center gap-2">
+                            <ChartIcon className="h-5 w-5 p-1 text-white bg-primary/70 rounded" />
+                            <span>
+                              Relatif vs Sektor (n={fundamentalSectorBenchmark?.sample_size ?? "?"})
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <ClipboardIcon className="h-5 w-5 p-1 text-white bg-primary/70 rounded" />
+                            <span>Threshold Standar</span>
+                          </div>
+                        )
+                      }
                     </span>
                   )}
                 </div>
@@ -760,7 +768,7 @@ export default function StockDetail() {
                   <div className="mt-5">
                     <Accordion
                       title={`Benchmark Median Sektor: ${fundamentalSectorBenchmark.sector}`}
-                      icon="📊"
+                      icon={<ChartIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />}
                     >
                       <div className="space-y-4">
                         <p className="text-xs text-muted-foreground">
@@ -783,7 +791,7 @@ export default function StockDetail() {
                                   ? pct
                                     ? `${Number(val).toFixed(2)}%`
                                     : Number(val).toLocaleString("id-ID", { maximumFractionDigits: 2 })
-                                  : "—"}
+                                  : "-"}
                               </p>
                             </div>
                           ))}
@@ -804,8 +812,10 @@ export default function StockDetail() {
                               </span>
                             </div>
 
-                            {/* Catatan kenapa EPS tidak masuk valuasi → accordion */}
-                            <Accordion title="Kenapa EPS tidak masuk interpretasi valuasi?" icon="💡">
+                            {/* Catatan kenapa EPS tidak masuk valuasi — accordion */}
+                            <Accordion title="Kenapa EPS tidak masuk interpretasi valuasi?" 
+                            icon={<LightbulbIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />}
+                            >
                               <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
                                 EPS adalah angka absolut dalam rupiah sehingga tidak bisa langsung
                                 dibandingkan antar saham. EPS bank besar dan EPS startup bisa berbeda
@@ -824,7 +834,8 @@ export default function StockDetail() {
                 {/* DETAIL SKOR PER RASIO */}
                 {fundamentalRuleHits.length > 0 && (
                   <div className="mt-5">
-                    <Accordion title="Detail Skor per Rasio" icon="📋">
+                    <Accordion title="Detail Skor per Rasio" 
+                     icon={<ClipboardIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />} >
                       <div className="overflow-x-auto rounded-xl border border-border/60">
                         <table className="w-full min-w-[520px] text-xs">
                           <thead>
@@ -857,11 +868,11 @@ export default function StockDetail() {
                                       ? "text-muted-foreground"
                                       : w >= 0 ? "text-success" : "text-danger"
                                   )}>
-                                    {isNoData ? "—" : `${w >= 0 ? "+" : ""}${w.toFixed(3)}`}
+                                    {isNoData ? "-" : `${w >= 0 ? "+" : ""}${w.toFixed(3)}`}
                                   </td>
                                   {hasZScore && (
                                     <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
-                                      {hit.z_score != null ? Number(hit.z_score).toFixed(2) : "—"}
+                                      {hit.z_score != null ? Number(hit.z_score).toFixed(2) : "-"}
                                     </td>
                                   )}
                                 </tr>
@@ -877,7 +888,7 @@ export default function StockDetail() {
                               )}>
                                 {fundamentalRawScore != null
                                   ? `${Number(fundamentalRawScore) >= 0 ? "+" : ""}${Number(fundamentalRawScore).toFixed(4)}`
-                                  : "—"}
+                                  : "-"}
                               </td>
                               {fundamentalRuleHits.some((h) => h.z_score !== undefined && h.z_score !== null) && <td />}
                             </tr>
@@ -888,10 +899,11 @@ export default function StockDetail() {
                   </div>
                 )}
 
-                {/* PENJELASAN METODOLOGI → accordion */}
+                {/* PENJELASAN METODOLOGI — accordion */}
                 {fundamentalExplanation && (
                   <div className="mt-4">
-                    <Accordion title="Metodologi Perhitungan" icon="🔬">
+                    <Accordion title="Metodologi Perhitungan" 
+                     icon={<MicroscopeIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />} >
                       <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
                         {fundamentalExplanation}{" "}
                         Sistem ini menilai saham menggunakan empat rasio utama: EPS, PER, PBV, dan ROE.
@@ -901,8 +913,8 @@ export default function StockDetail() {
                         dari rata-rata sektor, negatif kalau di bawahnya.
                         Semua skor dijumlahkan menjadi Raw Score Total, lalu dikonversi menjadi estimasi return
                         dalam persen untuk jangka menengah.
-                        Jika estimasi return ≥ 5% maka rekomendasinya <strong className="text-emerald-700 dark:text-emerald-400">BUY</strong>,{" "}
-                        ≤ −5% maka <strong className="text-red-700 dark:text-red-400">SELL</strong>,
+                        Jika estimasi return {"\u2265"} 5% maka rekomendasinya <strong className="text-emerald-700 dark:text-emerald-400">BUY</strong>,{" "}
+                        {"\u2264"} -5% maka <strong className="text-red-700 dark:text-red-400">SELL</strong>,
                         dan di antaranya <strong className="text-amber-700 dark:text-amber-400">HOLD</strong>.
                       </p>
                     </Accordion>
@@ -983,7 +995,7 @@ export default function StockDetail() {
                     label="PBV"
                     fullName="Price to Book Value"
                     value={formatFundValue(fundamentalsRatios.pbv ?? fundamental?.pbv)}
-                    description="Perbandingan harga saham terhadap nilai buku aset perusahaan. PBV di bawah 1× bisa berarti saham undervalued harga lebih murah dari nilai aset bersihnya."
+                    description="Perbandingan harga saham terhadap nilai buku aset perusahaan. PBV di bawah 1× bisa berarti saham undervalued — harga lebih murah dari nilai aset bersihnya."
                     hint="Dihitung dari Harga Saham ÷ Nilai Buku per Saham (Total Ekuitas ÷ jumlah saham). Wajar untuk growth stock di kisaran 1–3×."
                     good={(() => {
                       const v = Number(fundamentalsRatios.pbv ?? fundamental?.pbv);
@@ -1000,7 +1012,7 @@ export default function StockDetail() {
                       true
                     )}
                     description="Seberapa efisien perusahaan menghasilkan laba dari modal sendiri. Makin tinggi artinya manajemen makin produktif memutar uang pemegang saham."
-                    hint="Dihitung dari Net Income ÷ Total Ekuitas. ROE ≥ 15% dianggap sehat dan kompetitif di pasar Indonesia."
+                    hint="Dihitung dari Net Income ÷ Total Ekuitas. ROE >= 15% dianggap sehat dan kompetitif di pasar Indonesia."
                     good={Number(
                       fundamentalsRatios.roe ??
                       fundamentals?.fundamentals?.ratios?.roe ??
@@ -1010,13 +1022,14 @@ export default function StockDetail() {
                 </div>
               </div>
 
-              {/* KENAPA 4 RASIO INI → accordion */}
-              <Accordion title="Kenapa fokus ke EPS, PER, PBV, dan ROE?" icon="🧠">
+              {/* KENAPA 4 RASIO INI — accordion */}
+              <Accordion title="Kenapa fokus ke EPS, PER, PBV, dan ROE?" 
+              icon={<BrainIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />} >
                 <div className="space-y-4">
                   <p className="text-xs leading-relaxed text-justify text-muted-foreground">
                     Empat rasio ini dipilih sebagai fondasi utama karena paling stabil untuk membaca
                     laba, valuasi, dan efisiensi di banyak saham BEI. Bukan karena rasio lain tidak
-                    penting DER, ROA, NPM pun sering dipakai. Namun dari banyak studi dan
+                    penting — DER, ROA, NPM pun sering dipakai. Namun dari banyak studi dan
                     konsistensi lintas sektor di BEI, EPS, PER, PBV, dan ROE cenderung paling sering
                     menunjukkan pengaruh signifikan terhadap harga maupun return. Rasio lain kadang
                     sangat bergantung pada sektor tertentu (misalnya perbankan vs manufaktur),
@@ -1034,11 +1047,11 @@ export default function StockDetail() {
                       },
                       {
                         rasio: "PBV",
-                        alasan: "Membandingkan harga pasar dengan nilai buku aset berguna membaca apakah saham undervalued atau overvalued.",
+                        alasan: "Membandingkan harga pasar dengan nilai buku aset — berguna membaca apakah saham undervalued atau overvalued.",
                       },
                       {
                         rasio: "ROE",
-                        alasan: "Menilai efisiensi manajemen mengelola modal sendiri historis kuat untuk kualitas bisnis jangka menengah.",
+                        alasan: "Menilai efisiensi manajemen mengelola modal sendiri — historis kuat untuk kualitas bisnis jangka menengah.",
                       },
                     ].map(({ rasio, alasan }) => (
                       <div key={rasio} className="rounded-lg border border-border/50 bg-muted/10 p-3">
@@ -1048,18 +1061,22 @@ export default function StockDetail() {
                     ))}
                   </div>
                   <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-3">
-                    <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
-                      💡 <span className="font-medium text-foreground">Intinya:</span>{" "}
-                      Dashboard ini memprioritaskan rasio yang paling informatif, konsisten, dan
-                      mudah dibandingkan lintas saham Indonesia supaya analisis lebih sederhana
-                      tanpa kehilangan inti kualitas bisnis.
-                    </p>
+                     <p className="flex items-start gap-1.5 text-leading text-[12px]">
+                        <LightbulbIcon className="h-4 w-4 shrink-0 text-yellow-700" />
+                        <span className="font-medium text-foreground">Info:</span>
+                        <span>{" "}
+                          Dashboard ini memprioritaskan rasio yang paling informatif, konsisten, dan
+                          mudah dibandingkan lintas saham Indonesia supaya analisis lebih sederhana
+                          tanpa kehilangan inti kualitas bisnis.
+                      </span>
+                      </p>
                   </div>
                 </div>
               </Accordion>
 
-              {/* CATATAN HUBUNGAN RASIO → RAW DATA → accordion */}
-              <Accordion title="Dari mana angka-angka ini berasal?" icon="🔗">
+              {/* CATATAN HUBUNGAN RASIO -> RAW DATA — accordion */}
+              <Accordion title="Dari mana angka-angka ini berasal?" 
+              icon={<LinkIcon className="h-6 w-6 p-1 text-white bg-primary/70 rounded" />} >
                 <div className="space-y-2 text-xs leading-relaxed text-muted-foreground">
                   <p>
                     <span className="font-medium text-foreground">EPS</span> dihitung dari{" "}
@@ -1068,7 +1085,7 @@ export default function StockDetail() {
                   </p>
                   <p>
                     <span className="font-medium text-foreground">PER</span> dihitung dari
-                    harga saham saat ini dibagi EPS jadi EPS adalah bahan baku PER.
+                    harga saham saat ini dibagi EPS — jadi EPS adalah bahan baku PER.
                   </p>
                   <p>
                     <span className="font-medium text-foreground">PBV</span> dihitung dari
@@ -1111,7 +1128,7 @@ export default function StockDetail() {
                             <td className="px-4 py-3 font-medium">{prettyLabel(k, RAW_DATA_LABELS)}</td>
                             <td className="px-4 py-3 text-right font-mono tabular-nums">{formatRawValue(k, v)}</td>
                             <td className="px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-                              {RAW_DATA_CONTEXT[k] || "—"}
+                              {RAW_DATA_CONTEXT[k] || "-"}
                             </td>
                           </tr>
                         ))
@@ -1199,14 +1216,24 @@ function RatioCard({ label, fullName, value, description, hint, good }) {
           <p className="text-[10px] text-muted-foreground/60">{fullName}</p>
         </div>
         <span className={cn(
-          "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+          "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
           isGood
             ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
             : isBad
             ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
             : "border-border/50 bg-muted/20 text-muted-foreground"
         )}>
-          {isGood ? "✓ Baik" : isBad ? "✗ Perhatikan" : "—"}
+          {isGood ? (
+            <>
+              <Check className="h-3 w-3" /> Baik
+            </>
+          ) : isBad ? (
+            <>
+              <AlertTriangle className="h-3 w-3" /> Perhatikan
+            </>
+          ) : (
+            "-"
+          )}
         </span>
       </div>
 
@@ -1218,14 +1245,17 @@ function RatioCard({ label, fullName, value, description, hint, good }) {
         {value}
       </p>
 
-      {/* penjelasan + cara hitung → accordion */}
+      {/* penjelasan + cara hitung — accordion */}
       <Accordion title="Penjelasan & Cara Hitung">
         <div className="space-y-2">
           <p className="text-[11px] leading-relaxed text-justify text-muted-foreground">
             {description}
           </p>
           <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
-            <p className="text-[10px] leading-relaxed text-muted-foreground">💡 {hint}</p>
+            <p className="flex items-start gap-1.5">
+              <LightbulbIcon className="h-4 w-4 shrink-0 text-yellow-700" />
+              <span className="text-[10px] leading-relaxed text-muted-foreground">{hint}</span>
+            </p>
           </div>
         </div>
       </Accordion>
@@ -1246,17 +1276,21 @@ function InfoBox({ label, value }) {
 function RawRow({ labelKey, value }) {
   return (
     <tr className="border-b border-border/50 last:border-0 hover:bg-muted/10 transition-colors">
-      <td className="px-4 py-3 font-medium">{prettyLabel(labelKey, RAW_DATA_LABELS)}</td>
-      <td className="px-4 py-3 text-right font-mono tabular-nums">{formatRawValue(labelKey, value)}</td>
+      <td className="px-4 py-3 font-medium">
+        {prettyLabel(labelKey, RAW_DATA_LABELS)}
+      </td>
+      <td className="px-4 py-3 text-right font-mono tabular-nums">
+        {formatRawValue(labelKey, value)}
+      </td>
       <td className="px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-        {RAW_DATA_CONTEXT[labelKey] || "—"}
+        {RAW_DATA_CONTEXT[labelKey] || "-"}
       </td>
     </tr>
   );
 }
 
 function formatFundValue(value, isPercent = false) {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") return "-";
   const num = Number(value);
   if (!Number.isFinite(num)) return String(value);
   if (isPercent) return `${num.toFixed(2)}%`;
@@ -1264,7 +1298,7 @@ function formatFundValue(value, isPercent = false) {
 }
 
 function formatRawValue(key, value) {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") return "-";
   const lowerKey = String(key || "").toLowerCase();
   const num = Number(value);
   if (!Number.isFinite(num)) return String(value);
