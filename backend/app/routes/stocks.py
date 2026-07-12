@@ -27,7 +27,6 @@ def _sanitize_daily_histories(histories):
 
     return cleaned
 
-
 def _build_virtual_stock(ticker, stock=None):
     quote = YFinanceHelper.get_latest_quote(ticker) or {}
     info = YFinanceHelper.get_stock_info(ticker, translate_summary=False) or {}

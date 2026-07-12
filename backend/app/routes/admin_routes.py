@@ -369,73 +369,73 @@ def delete_stock(stock_id):
             "message": str(e)
         }), 500
 
-@admin_bp.route("/sync-stocks", methods=["POST"])
-@token_required
-@role_required("admin")
-def sync_stocks_data():
-    try:
-        stocks_to_sync = [
-            ("BBCA.JK", "BBCA"), ("BBRI.JK", "BBRI"), ("BMRI.JK", "BMRI"),
-            ("BRPT.JK", "BRPT"), ("HUMI.JK", "HUMI")
-        ]
-        synced_stocks = []
+# @admin_bp.route("/sync-stocks", methods=["POST"])
+# @token_required
+# @role_required("admin")
+# def sync_stocks_data():
+#     try:
+#         stocks_to_sync = [
+#             ("BBCA.JK", "BBCA"), ("BBRI.JK", "BBRI"), ("BMRI.JK", "BMRI"),
+#             ("BRPT.JK", "BRPT"), ("HUMI.JK", "HUMI")
+#         ]
+#         synced_stocks = []
 
-        for ticker_yf, ticker_code in stocks_to_sync:
-            try:
-                stock = Stock.query.filter_by(ticker=ticker_code).first()
-                if not stock:
-                    info = YFinanceHelper.get_stock_info(ticker_yf, translate_summary=True)
-                    stock = Stock(
-                        ticker=ticker_code,
-                        name=info.get("longName", ticker_code),
-                        sector=info.get("sector", "Unknown"),
-                        price=0,
-                        status="Active",
-                    )
-                    db.session.add(stock)
-                    db.session.flush()
+#         for ticker_yf, ticker_code in stocks_to_sync:
+#             try:
+#                 stock = Stock.query.filter_by(ticker=ticker_code).first()
+#                 if not stock:
+#                     info = YFinanceHelper.get_stock_info(ticker_yf, translate_summary=True)
+#                     stock = Stock(
+#                         ticker=ticker_code,
+#                         name=info.get("longName", ticker_code),
+#                         sector=info.get("sector", "Unknown"),
+#                         price=0,
+#                         status="Active",
+#                     )
+#                     db.session.add(stock)
+#                     db.session.flush()
 
-                info = YFinanceHelper.get_stock_info(ticker_yf, translate_summary=True)
-                profile = StockProfile.query.filter_by(stock_id=stock.id).first() or StockProfile(stock_id=stock.id)
-                if not getattr(profile, "id", None):
-                    db.session.add(profile)
-                profile.long_name = info.get("longName", "")
-                profile.short_name = info.get("shortName", "")
-                profile.sector = info.get("sector", "")
-                profile.industry = info.get("industry", "")
-                profile.website = info.get("website", "")
-                profile.city = info.get("city", "")
-                profile.country = info.get("country", "")
-                profile.long_business_summary = info.get("longBusinessSummary", "")
+#                 info = YFinanceHelper.get_stock_info(ticker_yf, translate_summary=True)
+#                 profile = StockProfile.query.filter_by(stock_id=stock.id).first() or StockProfile(stock_id=stock.id)
+#                 if not getattr(profile, "id", None):
+#                     db.session.add(profile)
+#                 profile.long_name = info.get("longName", "")
+#                 profile.short_name = info.get("shortName", "")
+#                 profile.sector = info.get("sector", "")
+#                 profile.industry = info.get("industry", "")
+#                 profile.website = info.get("website", "")
+#                 profile.city = info.get("city", "")
+#                 profile.country = info.get("country", "")
+#                 profile.long_business_summary = info.get("longBusinessSummary", "")
 
-                fundamentals = YFinanceHelper.get_fundamentals(ticker_yf)
-                fundamental = StockFundamental.query.filter_by(stock_id=stock.id).first() or StockFundamental(stock_id=stock.id)
-                if not getattr(fundamental, "id", None):
-                    db.session.add(fundamental)
-                fundamental.eps_ttm = fundamentals.get("eps")
-                fundamental.pbv = fundamentals.get("pbv")
-                fundamental.roe = fundamentals.get("roe")
-                fundamental.per_ttm = fundamentals.get("pe")
-                raw = fundamentals.get("rawData", {})
-                fundamental.revenue = raw.get("revenue")
-                fundamental.net_income = raw.get("netIncome")
-                fundamental.total_assets = raw.get("totalAssets")
-                fundamental.total_equity = raw.get("totalEquity")
+#                 fundamentals = YFinanceHelper.get_fundamentals(ticker_yf)
+#                 fundamental = StockFundamental.query.filter_by(stock_id=stock.id).first() or StockFundamental(stock_id=stock.id)
+#                 if not getattr(fundamental, "id", None):
+#                     db.session.add(fundamental)
+#                 fundamental.eps_ttm = fundamentals.get("eps")
+#                 fundamental.pbv = fundamentals.get("pbv")
+#                 fundamental.roe = fundamentals.get("roe")
+#                 fundamental.per_ttm = fundamentals.get("pe")
+#                 raw = fundamentals.get("rawData", {})
+#                 fundamental.revenue = raw.get("revenue")
+#                 fundamental.net_income = raw.get("netIncome")
+#                 fundamental.total_assets = raw.get("totalAssets")
+#                 fundamental.total_equity = raw.get("totalEquity")
 
-                ohlc_data = _save_daily_ohlc(stock.id, ticker_yf)
-                if ohlc_data:
-                    stock.price = ohlc_data[-1]["close"]
-                synced_stocks.append(ticker_code)
-                SystemLogger.success("Stock Sync", f"Sinkronisasi berhasil untuk {ticker_code}", user_id=_user_id(), entity_type="Stock", entity_id=stock.id, ip_address=_ip_address())
-            except Exception as e:
-                logger.error(f"Error syncing {ticker_code}: {e}")
-                SystemLogger.error("Stock Sync", f"Sinkronisasi gagal untuk {ticker_code}", details=str(e), user_id=_user_id(), entity_type="Stock", ip_address=_ip_address())
-                continue
+#                 ohlc_data = _save_daily_ohlc(stock.id, ticker_yf)
+#                 if ohlc_data:
+#                     stock.price = ohlc_data[-1]["close"]
+#                 synced_stocks.append(ticker_code)
+#                 SystemLogger.success("Stock Sync", f"Sinkronisasi berhasil untuk {ticker_code}", user_id=_user_id(), entity_type="Stock", entity_id=stock.id, ip_address=_ip_address())
+#             except Exception as e:
+#                 logger.error(f"Error syncing {ticker_code}: {e}")
+#                 SystemLogger.error("Stock Sync", f"Sinkronisasi gagal untuk {ticker_code}", details=str(e), user_id=_user_id(), entity_type="Stock", ip_address=_ip_address())
+#                 continue
 
-        db.session.commit()
+#         db.session.commit()
 
-        return jsonify({"success": True, "message": f"Sinkronisasi berhasil untuk {len(synced_stocks)} saham", "synced_stocks": synced_stocks}), 200
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Sync error: {str(e)}")
-        return jsonify({"success": False, "message": str(e)}), 500
+#         return jsonify({"success": True, "message": f"Sinkronisasi berhasil untuk {len(synced_stocks)} saham", "synced_stocks": synced_stocks}), 200
+#     except Exception as e:
+#         db.session.rollback()
+#         logger.error(f"Sync error: {str(e)}")
+#         return jsonify({"success": False, "message": str(e)}), 500
