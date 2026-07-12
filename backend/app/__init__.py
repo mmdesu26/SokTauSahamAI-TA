@@ -1,7 +1,3 @@
-# ============================================================
-# app/__init__.py — factory Flask, inisialisasi extensions + blueprint
-# ============================================================
-
 from flask import Flask  # core framework
 from flask_bcrypt import Bcrypt  # hash password
 from flask_cors import CORS  # biar frontend beda origin bisa akses
@@ -45,14 +41,12 @@ def create_app():
     # import blueprint di dalam factory biar hindari circular import
     from app.routes.auth_routes import auth_bp
     from app.routes.admin_routes import admin_bp
-    from app.routes.investor_routes import investor_bp
     from app.routes.glossary import glossary_bp
     from app.routes.stocks import stocks_bp
 
     # daftarin blueprint dengan prefix URL
     app.register_blueprint(auth_bp, url_prefix="/api/auth")  # login/logout
     app.register_blueprint(admin_bp, url_prefix="/api/admin")  # fitur admin
-    app.register_blueprint(investor_bp, url_prefix="/api/investor")  # fitur user
     app.register_blueprint(glossary_bp, url_prefix="/api")  # glossary istilah
     app.register_blueprint(stocks_bp, url_prefix="/api")  # data saham + prediksi
 
