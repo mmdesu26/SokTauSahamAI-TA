@@ -52,6 +52,4 @@ export function refreshAdminSession() {
   // perpanjang waktu idle pas user aktif
   if (!isAdminSessionActive()) return;
   sessionStorage.setItem(EXPIRES_KEY, String(Date.now() + IDLE_LIMIT_MS));
-}
-
-export const ADMIN_IDLE_LIMIT_MS = IDLE_LIMIT_MS;
+};

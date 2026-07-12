@@ -1,10 +1,9 @@
-// HOME PAGE — gabungin landing + dashboard
 // flow: Hero -> Ringkasan Pasar -> Service -> Why Us -> CTA
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   TrendingUp, TrendingDown, Coins, ArrowRight, Sparkles, ShieldCheck, Brain,
-  LineChart, Search, BookOpen, Zap, Lock, Users, Layers3
+  LineChart, Search, BookOpen, Zap, Users, Layers3
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import Button from "@/components/ui/Button";

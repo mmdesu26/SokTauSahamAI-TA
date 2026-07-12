@@ -1,6 +1,6 @@
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
 from app.utils.text_helper import TextHelper
@@ -26,15 +26,15 @@ class YFinanceHelper:
 
         return f"{symbol}.JK"
 
-    @staticmethod
-    def _to_jakarta_naive(dt_value):
-        if dt_value is None:
-            return None
+    # @staticmethod
+    # def _to_jakarta_naive(dt_value):
+    #     if dt_value is None:
+    #         return None
 
-        if getattr(dt_value, "tzinfo", None) is not None:
-            return dt_value.tz_convert(YFinanceHelper.JAKARTA_TZ).tz_localize(None)
+    #     if getattr(dt_value, "tzinfo", None) is not None:
+    #         return dt_value.tz_convert(YFinanceHelper.JAKARTA_TZ).tz_localize(None)
 
-        return dt_value
+    #     return dt_value
 
     @staticmethod
     def _format_dt(dt_value):
@@ -205,30 +205,30 @@ class YFinanceHelper:
             logger.error(f"Error fetching historical prices for {symbol}: {str(e)}")
             return None
 
-    @staticmethod
-    def get_last_completed_daily_close(ticker):
-        symbol = YFinanceHelper.normalize_symbol(ticker)
-        try:
-            hist = YFinanceHelper.get_historical_prices(symbol, days=10, exclude_today=True)
-            if hist is None or hist.empty:
-                return None
+    # @staticmethod
+    # def get_last_completed_daily_close(ticker):
+    #     symbol = YFinanceHelper.normalize_symbol(ticker)
+    #     try:
+    #         hist = YFinanceHelper.get_historical_prices(symbol, days=10, exclude_today=True)
+    #         if hist is None or hist.empty:
+    #             return None
 
-            last_dt = hist.index[-1]
-            last_row = hist.iloc[-1]
+    #         last_dt = hist.index[-1]
+    #         last_row = hist.iloc[-1]
 
-            return {
-                "date": last_dt.strftime("%Y-%m-%d"),
-                "updatedAt": YFinanceHelper._format_dt(last_dt),
-                "close": float(last_row.get("Close", 0) or 0),
-                "open": float(last_row.get("Open", 0) or 0),
-                "high": float(last_row.get("High", 0) or 0),
-                "low": float(last_row.get("Low", 0) or 0),
-                "symbol": symbol,
-                "source": "yfinance_daily_completed",
-            }
-        except Exception as e:
-            logger.error(f"Error fetching last completed daily close for {symbol}: {str(e)}")
-            return None
+    #         return {
+    #             "date": last_dt.strftime("%Y-%m-%d"),
+    #             "updatedAt": YFinanceHelper._format_dt(last_dt),
+    #             "close": float(last_row.get("Close", 0) or 0),
+    #             "open": float(last_row.get("Open", 0) or 0),
+    #             "high": float(last_row.get("High", 0) or 0),
+    #             "low": float(last_row.get("Low", 0) or 0),
+    #             "symbol": symbol,
+    #             "source": "yfinance_daily_completed",
+    #         }
+    #     except Exception as e:
+    #         logger.error(f"Error fetching last completed daily close for {symbol}: {str(e)}")
+    #         return None
 
     @staticmethod
     def get_intraday_ohlc(ticker, interval="60m", period="5d"):

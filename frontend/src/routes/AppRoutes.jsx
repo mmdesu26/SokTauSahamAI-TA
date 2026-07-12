@@ -1,4 +1,3 @@
-// app routes — restruktur sesuai brief
 // landing & dashboard digabung jadi satu flow di / (Home)
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";

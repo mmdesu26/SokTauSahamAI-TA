@@ -30,7 +30,6 @@ import yfinance as yf
 
 from app.utils.yfinance_helper import YFinanceHelper
 from app.ml.fundamental import (
-    FundamentalScorer,
     BUY_THRESHOLD,
     SELL_THRESHOLD,
     SCORE_TO_RETURN_MULTIPLIER,

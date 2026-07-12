@@ -50,9 +50,3 @@ export function getCompanyLogoCandidates(website, ticker, logoUrl) {
 
   return candidates; // balikin array (bisa kosong)
 }
-
-// versi lama — backward compat, balikin 1 URL pertama aja
-export function getCompanyLogo(website, ticker, logoUrl) {
-  const list = getCompanyLogoCandidates(website, ticker, logoUrl); // ambil kandidat
-  return list.length ? list[0] : null; // ambil yang pertama atau null
-}
